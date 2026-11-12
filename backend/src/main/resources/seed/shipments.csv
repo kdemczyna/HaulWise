@@ -1,0 +1,15 @@
+reference,origin,destination,pallets,weight_kg,priority,pinned_first,deadline_day,deadline_time
+PO-1041,WAW Central,LUB East,6,3600,URGENT,false,0,20:00
+PO-1042,WAW Central,GDN Port,10,6500,HIGH,true,,
+PO-1043,WAW Central,KRK South,6,4100,HIGH,false,1,12:00
+PO-1044,WAW Central,POZ West,16,11000,NORMAL,false,,
+PO-1045,WAW Central,KRK South,14,9800,NORMAL,false,,
+PO-1046,WAW Central,LDZ Cross-dock,12,7400,NORMAL,false,0,10:00
+PO-1047,WAW Central,KTW Silesia,8,5200,NORMAL,false,,
+PO-1048,WAW Central,SZZ North-West,5,3100,NORMAL,false,1,16:00
+PO-1049,WAW Central,WRO Hub,4,2600,NORMAL,false,,
+PO-1050,WAW Central,GDN Port,2,800,NORMAL,false,,
+PO-1099,WAW Central,WRO Hub,36,21000,NORMAL,false,,
+PO-2001,POZ West,WRO Hub,8,5000,NORMAL,false,,
+PO-2002,POZ West,SZZ North-West,12,8200,HIGH,false,0,14:00
+PO-2003,POZ West,WAW Central,6,3900,NORMAL,false,1,10:00

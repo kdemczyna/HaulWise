@@ -1,0 +1,6 @@
+plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour
+WX 1001A,33,24000,28,10,45
+WX 2002B,33,24000,29,10,45
+WX 3003C,18,12000,22,7,42
+WX 4004D,10,6000,18,5,40
+PO 5005E,33,24000,27,10,45
