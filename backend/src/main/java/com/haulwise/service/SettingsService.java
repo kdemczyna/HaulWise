@@ -29,6 +29,12 @@ public class SettingsService {
         return SettingsResponse.from(loadOrCreate());
     }
 
+    /** Road factor and average speed for distance estimates; for other services, not the API. */
+    public EstimateParameters estimateParameters() {
+        Settings settings = loadOrCreate();
+        return new EstimateParameters(settings.getRoadFactor(), settings.getAverageSpeedKmh());
+    }
+
     public SettingsResponse update(SettingsRequest request) {
         checkCrossFieldRules(request);
         Settings settings = loadOrCreate();

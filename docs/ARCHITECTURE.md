@@ -212,14 +212,14 @@ WAW Central - Warsaw 52.2297, 21.0122 | KRK South - Krakow 50.0647, 19.9450 | GD
 
 | | KRK | GDN | POZ | WRO | LDZ | KTW | LUB | SZZ |
 |---|---|---|---|---|---|---|---|---|
-| **WAW** | 295/253 | 340/291 | 310/266 | 345/296 | 135/116 | 290/249 | 170/146 | 565/484 |
-| **KRK** | | 590/506 | 455/455 | 270/231 | 275/236 | 80/69 | 270/270 | 690/591 |
-| **GDN** | | | 315/270 | 485/416 | 340/291 | 540/463 | 500/500 | 350/350 |
-| **POZ** | | | | 180/154 | 215/184 | 370/370 | 470/470 | 240/206 |
+| **WAW** | 295/253 | 340/291 | 310/266 | 345/296 | 135/116 | 290/249 | 170/146 | 565/470 |
+| **KRK** | | 590/506 | 455/390 | 270/231 | 275/236 | 80/69 | 270/270 | 640/548 |
+| **GDN** | | | 315/270 | 485/416 | 340/291 | 540/463 | 505/435 | 350/350 |
+| **POZ** | | | | 180/154 | 215/184 | 375/322 | 475/410 | 240/206 |
 | **WRO** | | | | | 220/189 | 200/171 | 440/440 | 370/317 |
 | **LDZ** | | | | | | 200/171 | 250/250 | 430/369 |
 | **KTW** | | | | | | | 320/320 | 560/480 |
-| **LUB** | | | | | | | | 700/700 |
+| **LUB** | | | | | | | | 700/600 |
 
 **Trucks**: `WX 1001A` 33 pal / 24000 kg / 28 + 10 L / 45 PLN/h; `WX 2002B` 33 / 24000 / 29 + 10 / 45; `WX 3003C` 18 / 12000 / 22 + 7 / 42; `WX 4004D` 10 / 6000 / 18 + 5 / 40; `PO 5005E` 33 / 24000 / 27 + 10 / 45.
 
@@ -532,15 +532,15 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 | T-02 | Entities in `domain/`; `Settings` single row; indexes per section 4; `RouteLeg` unique constraint |
 | T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4. `GlobalExceptionHandler` also maps `DataIntegrityViolationException` to 409 `CONFLICT` as a backstop (the DB unique on `warehouse.name` is case-sensitive while the service check is case-insensitive; races). Add an API test "update warehouse coordinates -> GET returns the new values and no legs remain" |
 | T-04 | `CorsConfig` + `OpenApiConfig` (title, version); springdoc 2.8.17. Done: `HaulWiseProperties` (only the `cors` group so far; later tasks add theirs; wildcard/empty origins fail startup); controllers carry `@Tag`/`@Operation` summaries, `@ResponseStatus` (201/204, docs only - runtime status still comes from `ResponseEntity`) and `@ConflictResponse` (`controller` package; adds a documented 409); an `OpenApiCustomizer` adds a `Problem` schema and attaches it as `application/problem+json` to 400 (body or parameters), 404 (operations with a path parameter) and every other 4xx; `springdoc.default-produces/consumes-media-type: application/json`; API version `0.1.0` (matches the pom); origins `*` and `null` fail startup |
-| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1. Read `RouteLeg` from/to ids via a query projection or fetch join, not via lazy proxy id access |
+| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1. Read `RouteLeg` from/to ids via a query projection or fetch join, not via lazy proxy id access. Done: solver side (pure) `solver/Haversine`, `solver/DistanceMatrixBuilder` (stored leg wins, else haversine x roadFactor at averageSpeedKmh), `solver/model/{DistanceProvider, DistanceMatrix, LegDistance, DistanceSource (SEEDED/OSRM/ESTIMATED), DirectedPair, GeoPoint}`; same warehouse = `LegDistance.ZERO` (not an estimate). Road factor and average speed come from the Settings row via `SettingsService.estimateParameters()` (internal record `EstimateParameters`; `SettingsResponse` is API-only; no `haulwise.solver.*` keys for them). `RouteLegRepository.findLegsBetween(ids)` returns `StoredLeg` id projections (JPQL constructor expression). `DistanceService.buildMatrix(ids)` (id order, unknown id -> `IllegalArgumentException`, callers validate first) and `getMatrix()` (all warehouses by name, legs row by row). DTO `DistanceMatrixResponse {warehouses:[{id,name}], legs:[{fromId,toId,distanceKm (1 dp),durationMinutes (int),source}]}`. `seed/matrix.csv` header `from,to,distance_km,duration_minutes`, warehouses by **name**, one row per unordered pair (36); `seed/MatrixCsvParser` validates it (`SeedDataException` with line number; strips a UTF-8 BOM; does not close the caller's `Reader`) and `MatrixCsvRow.reversed()` gives the other direction - persisting legs at startup is T-08 |
 | T-06 | `RouteEvaluator` + `CostParameters`; tests incl. 33.0 L example and heavy-first |
 | T-07 | `GET/PUT /api/settings`; defaults section 6.4. `SettingsService` loads `findById(Settings.SINGLETON_ID).orElseGet(() -> save(Settings.withDefaults()))` |
-| T-08 | `SeedDataLoader` + CSVs; guarded by `haulwise.seed.enabled` |
+| T-08 | `SeedDataLoader` + CSVs; guarded by `haulwise.seed.enabled`. Open `seed/matrix.csv` (and the other CSVs) with `StandardCharsets.UTF_8`; parse with `MatrixCsvParser` (caller owns and closes the `Reader`), resolve names to warehouses (unknown name -> fail startup) and store each row plus `reversed()` as `SEEDED` legs |
 | T-09 | `BinPacker`, D-03, reasons |
 | T-10 | `StopGrouper`, `StopSequencer`; permutations via recursive swap with fixed pinned head |
 | T-11 | `PriorityObjective`; PIN_CONFLICT |
 | T-12 | `DeltaCalculator`, D-14, sentence rules 6.5 |
-| T-13 | `PlanService` (validate, build input, call `Planner`, map, store), `PlanController` POST/GET |
+| T-13 | `PlanService` (validate, build input, call `Planner`, map, store), `PlanController` POST/GET. Validate depot, shipment and truck ids first (`RequestValidationException` / `NotFoundException`): `DistanceService.buildMatrix` throws `IllegalArgumentException` for unknown ids, which would otherwise surface as a 500 |
 | T-14 | Mantine provider, router, `AppLayout`, `api/client.js`, common states; add `window.matchMedia` and `ResizeObserver` mocks to `src/test/setup.js` (required by Mantine in jsdom) |
 | T-15 | CRUD pages + forms; server field-error mapping |
 | T-16 | `PlanForm`, `PlanResultPage`, `RouteMap` |
