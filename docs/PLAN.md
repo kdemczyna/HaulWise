@@ -124,7 +124,7 @@ Each task is about 1-3 hours.
 ### Day 1 - Skeleton, domain, CRUD, matrix, cost model
 - [x] **T-01** Repo skeleton: `backend/` (Spring Boot, Maven wrapper, Java 17), `frontend/` (Vite React JS), root `.gitignore`, `docs/`. (Must)
 - [x] **T-02** Domain model + H2 config + repositories: Warehouse, Truck, Shipment, Settings; layered packages (controller / service / repository / dto / solver). (Must)
-- [ ] **T-03** CRUD REST API for warehouses, trucks, shipments: DTOs, validation, global error handler, correct status codes (409 on referenced delete). (Must)
+- [x] **T-03** CRUD REST API for warehouses, trucks, shipments: DTOs, validation, global error handler, correct status codes (409 on referenced delete). (Must)
 - [ ] **T-04** CORS config (env-driven allowed origins) and OpenAPI/Swagger page. (Must)
 - [ ] **T-05** Distance/time matrix: seeded matrix between 8-10 Polish cities, `DistanceProvider` interface, haversine x road-factor fallback. (Must)
 - [ ] **T-06** Fuel and cost model as a pure class + unit tests (load-dependent consumption, driver time, cost). (Must)
