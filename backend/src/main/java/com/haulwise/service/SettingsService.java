@@ -7,6 +7,7 @@ import com.haulwise.exception.FieldViolation;
 import com.haulwise.exception.RequestValidationException;
 import com.haulwise.repository.SettingsRepository;
 import com.haulwise.solver.model.CostParameters;
+import com.haulwise.solver.model.PriorityWeights;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,12 @@ public class SettingsService {
     public CostParameters costParameters() {
         Settings settings = loadOrCreate();
         return new CostParameters(settings.getDieselPricePlnPerLitre(), settings.getServiceMinutesPerStop());
+    }
+
+    /** URGENT and HIGH penalty weights for the PRIORITY objective (ARCHITECTURE 6.3); not for the API. */
+    public PriorityWeights priorityWeights() {
+        Settings settings = loadOrCreate();
+        return new PriorityWeights(settings.getUrgentWeightPlnPerHour(), settings.getHighWeightPlnPerHour());
     }
 
     public SettingsResponse update(SettingsRequest request) {

@@ -44,7 +44,8 @@ public class OpenApiConfig {
     private static final String PROBLEM_SCHEMA = "Problem";
 
     /** Order of the tags declared on the controllers; tags not listed here follow in their own order. */
-    static final List<String> TAG_ORDER = List.of("Warehouses", "Trucks", "Shipments", "Settings", "Distances");
+    static final List<String> TAG_ORDER = List.of(
+            "Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans");
 
     @Bean
     OpenAPI haulWiseOpenApi() {
@@ -52,7 +53,8 @@ public class OpenApiConfig {
                 .title(TITLE)
                 .version(API_VERSION)
                 .description("Plan delivery runs: manage warehouses, trucks and shipments, tune the cost "
-                        + "settings and inspect the distance matrix between warehouses. Date-times are local "
+                        + "settings, inspect the distance matrix between warehouses and plan runs (optimal and "
+                        + "priority-respecting plans with the cost of priority). Date-times are local "
                         + "Europe/Warsaw times without offset. Errors use RFC 9457 problem+json with a "
                         + "machine-readable `code`."));
     }
@@ -130,9 +132,20 @@ public class OpenApiConfig {
                 && operation.getParameters().stream().anyMatch(parameter -> "path".equals(parameter.getIn()));
     }
 
+    /**
+     * POST/PUT bodies and non-string parameters can be malformed or invalid. A string path parameter (a plan id)
+     * accepts any value, so an operation with only that cannot answer 400.
+     */
     private static boolean acceptsInput(PathItem.HttpMethod method, Operation operation) {
         return method == PathItem.HttpMethod.POST || method == PathItem.HttpMethod.PUT
-                || operation.getParameters() != null && !operation.getParameters().isEmpty();
+                || operation.getParameters() != null && operation.getParameters().stream()
+                        .anyMatch(parameter -> !"path".equals(parameter.getIn()) || !isString(parameter.getSchema()));
+    }
+
+    private static boolean isString(Schema<?> schema) {
+        // OpenAPI 3.1 models keep the type in getTypes(); 3.0 models in getType()
+        return schema != null && ("string".equals(schema.getType())
+                || schema.getTypes() != null && schema.getTypes().contains("string"));
     }
 
     private static void addIfAbsent(ApiResponses responses, String code, String description) {

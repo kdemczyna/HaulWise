@@ -1,6 +1,6 @@
 reference,origin,destination,pallets,weight_kg,priority,pinned_first,deadline_day,deadline_time
 PO-1041,WAW Central,LUB East,6,3600,URGENT,false,0,20:00
-PO-1042,WAW Central,GDN Port,10,6500,HIGH,true,,
+PO-1042,WAW Central,GDN Port,10,6500,HIGH,true,0,12:00
 PO-1043,WAW Central,KRK South,6,4100,HIGH,false,1,12:00
 PO-1044,WAW Central,POZ West,16,11000,NORMAL,false,,
 PO-1045,WAW Central,KRK South,14,9800,NORMAL,false,,

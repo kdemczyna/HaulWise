@@ -2,6 +2,7 @@ package com.haulwise.repository;
 
 import com.haulwise.domain.Priority;
 import com.haulwise.domain.Shipment;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -14,6 +15,10 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     /** One shipment with origin and destination fetched, safe to map outside the session. */
     @EntityGraph(attributePaths = {"origin", "destination"})
     Optional<Shipment> findWithWarehousesById(Long id);
+
+    /** The shipments with these ids (unknown ids are skipped), origin and destination fetched. */
+    @EntityGraph(attributePaths = {"origin", "destination"})
+    List<Shipment> findWithWarehousesByIdIn(Collection<Long> ids);
 
     /**
      * Shipments matching the optional filters ({@code null} = no filter), with origin and destination

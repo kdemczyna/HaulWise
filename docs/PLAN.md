@@ -4,7 +4,7 @@
 
 **HaulWise** is a dispatcher tool for a fictional Polish company with several warehouses that moves goods between them by truck. For one **run from one depot**, the app assigns shipments to trucks, orders the stops, and picks the route that is optimal by **fuel cost and travel time**. The dispatcher can **prioritise** deliveries even when that is not optimal.
 
-**Creative twist (headline): "Cost of priority".** The app shows the optimal plan next to the priority-respecting plan, with a plain-language delta, e.g. "Delivering Gdansk first costs +38 km, +PLN 112 and +0 h 41 min."
+**Creative twist (headline): "Cost of priority".** The app shows the optimal plan next to the priority-respecting plan, with a plain-language delta, e.g. "Delivering Gdansk first costs 112.35 PLN more (38 km and 41 min longer)."
 
 - Stack (fixed): Java + Spring Boot backend, H2 in-memory DB, React + plain JavaScript (Vite, no TypeScript) frontend, separate `backend/` and `frontend/` folders, REST + CORS.
 - English UI, currency PLN.
@@ -134,11 +134,11 @@ Each task is about 1-3 hours.
 **Day 1 milestone:** CRUD works via Swagger/curl, CORS verified, matrix queryable, cost model tested.
 
 ### Day 2 - Planner, priority, cost-of-priority, plan API, frontend CRUD, map
-- [ ] **T-09** Bin packing: first-fit-decreasing by priority then size, atomic shipments, unassigned reasons + unit tests. (Must)
-- [ ] **T-10** Stop ordering: brute-force permutations for 8 stops or fewer; nearest neighbour + 2-opt otherwise; optional return to depot + unit tests. (Must)
-- [ ] **T-11** Priority handling: weighted penalty plus hard pin-first + unit tests. (Must)
-- [ ] **T-12** Cost of priority: run optimal and priority plans, compute delta and plain-language text + unit tests. (Must)
-- [ ] **T-13** Plan API: `POST /api/plans` (depot, shipment ids, truck ids, return flag) returning both plans, delta and warnings. (Must)
+- [x] **T-09** Bin packing: first-fit-decreasing by priority then size, atomic shipments, unassigned reasons + unit tests. (Must)
+- [x] **T-10** Stop ordering: brute-force permutations for 8 stops or fewer; nearest neighbour + 2-opt otherwise; optional return to depot + unit tests. (Must)
+- [x] **T-11** Priority handling: weighted penalty plus hard pin-first + unit tests. (Must)
+- [x] **T-12** Cost of priority: run optimal and priority plans, compute delta and plain-language text + unit tests. (Must)
+- [x] **T-13** Plan API: `POST /api/plans` (depot, shipment ids, truck ids, return flag) returning both plans, delta and warnings. (Must)
 - [ ] **T-14** Frontend setup: routing, API client, layout, CSS design tokens, loading/error/empty components. Add `matchMedia`/`ResizeObserver` mocks to `src/test/setup.js` for Mantine. (Must)
 - [ ] **T-15** Frontend CRUD pages for warehouses, trucks, shipments (forms, validation messages, delete confirm). (Must)
 - [ ] **T-16** Plan form and first plan result view; Leaflet map with numbered stops. (Must)

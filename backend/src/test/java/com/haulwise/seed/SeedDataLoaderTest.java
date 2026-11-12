@@ -110,6 +110,8 @@ class SeedDataLoaderTest {
                 .satisfies(s -> {
                     assertThat(s.destination().city()).isEqualTo("Gdansk");
                     assertThat(s.priority()).isEqualTo(Priority.HIGH);
+                    assertThat(s.reference()).isEqualTo("PO-1042");
+                    assertThat(s.deadline()).isEqualTo(LocalDateTime.of(2026, 11, 13, 12, 0));
                 });
         assertThat(all).filteredOn(s -> s.pallets() > 33).extracting(ShipmentResponse::reference)
                 .containsExactly("PO-1099");
