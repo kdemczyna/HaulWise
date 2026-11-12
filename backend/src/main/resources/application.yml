@@ -19,6 +19,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  jackson:
+    deserialization:
+      # 20.7 for an integer field is a 400, not silently truncated to 20
+      accept-float-as-int: false
 
 springdoc:
   default-produces-media-type: application/json

@@ -128,7 +128,7 @@ Each task is about 1-3 hours.
 - [x] **T-04** CORS config (env-driven allowed origins) and OpenAPI/Swagger page. (Must)
 - [ ] **T-05** Distance/time matrix: seeded matrix between 8-10 Polish cities, `DistanceProvider` interface, haversine x road-factor fallback. (Must)
 - [ ] **T-06** Fuel and cost model as a pure class + unit tests (load-dependent consumption, driver time, cost). (Must)
-- [ ] **T-07** Settings API (diesel price, average speed, priority weights, compliance limits) with Polish defaults. (Must)
+- [x] **T-07** Settings API (diesel price, average speed, priority weights, compliance limits) with Polish defaults. (Must)
 - [ ] **T-08** Seed loader: warehouses, trucks, a realistic set of shipments. (Must)
 
 **Day 1 milestone:** CRUD works via Swagger/curl, CORS verified, matrix queryable, cost model tested.

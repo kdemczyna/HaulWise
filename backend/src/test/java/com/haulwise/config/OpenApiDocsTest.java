@@ -28,7 +28,10 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.info.version").isNotEmpty())
                 .andExpect(jsonPath("$.paths['/api/warehouses'].get.summary").isNotEmpty())
                 .andExpect(jsonPath("$.paths['/api/trucks/{id}']").exists())
-                .andExpect(jsonPath("$.paths['/api/shipments']").exists());
+                .andExpect(jsonPath("$.paths['/api/shipments']").exists())
+                .andExpect(jsonPath("$.paths['/api/settings'].get.summary").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/settings'].put.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/settings'].put.responses['409']").doesNotExist());
     }
 
     @Test
