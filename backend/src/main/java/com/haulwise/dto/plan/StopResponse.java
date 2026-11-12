@@ -2,6 +2,7 @@ package com.haulwise.dto.plan;
 
 import com.haulwise.domain.Priority;
 import com.haulwise.solver.model.DistanceSource;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,6 +33,8 @@ public record StopResponse(
         int dropPallets,
         int dropWeightKg,
         Priority priority,
+        @Schema(description = "The truck's kept pin-first request; only PRIORITY forces this stop first, "
+                + "OPTIMAL ignores it")
         boolean pinned,
         BigDecimal legDistanceKm,
         long legDurationMinutes,

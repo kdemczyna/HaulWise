@@ -50,6 +50,8 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/plans'].post.responses['201']").exists())
                 .andExpect(jsonPath("$.paths['/api/plans'].post.responses['400']"
                         + ".content['application/problem+json'].schema.$ref").value(PROBLEM_REF))
+                .andExpect(jsonPath("$.paths['/api/plans/{id}'].get.responses['400']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/warehouses/{id}'].get.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/plans/{id}'].get.responses['404']"
                         + ".content['application/problem+json'].schema.$ref").value(PROBLEM_REF));
     }
@@ -94,6 +96,20 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/warehouses/{id}'].delete.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/api/warehouses/{id}'].delete.responses['404']"
                         + ".content['application/problem+json'].schema.$ref").value(PROBLEM_REF));
+    }
+
+    @Test
+    void planSchemasDocumentLocalDepartureTimeAndPinnedMeaning() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath("$.components.schemas.PlanRequest.properties.departureTime.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.PlanRequest.properties.departureTime.format").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.PlanRequest.properties.departureTime.example")
+                        .value("2026-11-13T06:00:00"))
+                .andExpect(jsonPath("$.components.schemas.PlanRequest.properties.departureTime.pattern").isNotEmpty())
+                .andExpect(jsonPath("$.components.schemas.PlanRequest.properties.departureTime.description",
+                        containsString("without offset")))
+                .andExpect(jsonPath("$.components.schemas.StopResponse.properties.pinned.description",
+                        containsString("OPTIMAL ignores it")));
     }
 
     @Test

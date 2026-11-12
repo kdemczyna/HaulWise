@@ -18,6 +18,8 @@ import java.util.Objects;
  * The cost of priority (ARCHITECTURE 6.1 step 7, 6.5): PRIORITY totals minus OPTIMAL totals and a
  * plain-language sentence.
  * <ul>
+ *   <li>No truck was loaded (both variants empty): zeros, {@code noExtraCost} true and "No shipments could be
+ *       loaded onto the selected trucks, so there is nothing to compare."</li>
  *   <li>No extra cost when |cost| &lt; {@value #NO_EXTRA_COST_PLN} PLN and |distance| &lt;
  *       {@value #NO_EXTRA_DISTANCE_KM} km: "Respecting priorities costs nothing extra."</li>
  *   <li>Otherwise the cost is the main clause and distance and time follow in words:
@@ -41,6 +43,8 @@ public final class DeltaCalculator {
     static final double NO_EXTRA_COST_PLN = 0.50;
     static final double NO_EXTRA_DISTANCE_KM = 0.5;
     static final String NO_EXTRA_COST_SENTENCE = "Respecting priorities costs nothing extra.";
+    static final String NOTHING_TO_COMPARE_SENTENCE =
+            "No shipments could be loaded onto the selected trucks, so there is nothing to compare.";
     static final String FALLBACK_SUBJECT = "Respecting priorities";
     static final int MAX_NAMED_CITIES = 3;
 
@@ -67,9 +71,14 @@ public final class DeltaCalculator {
         double durationMinutes = withPriority.totalMinutes() - byCost.totalMinutes();
         double costPln = withPriority.costPln() - byCost.costPln();
         boolean noExtraCost = Math.abs(costPln) < NO_EXTRA_COST_PLN && Math.abs(distanceKm) < NO_EXTRA_DISTANCE_KM;
-        String sentence = noExtraCost
-                ? NO_EXTRA_COST_SENTENCE
-                : sentence(subject(optimal, priority, cityNames), distanceKm, costPln, durationMinutes);
+        String sentence;
+        if (optimal.routes().isEmpty()) {
+            sentence = NOTHING_TO_COMPARE_SENTENCE;
+        } else if (noExtraCost) {
+            sentence = NO_EXTRA_COST_SENTENCE;
+        } else {
+            sentence = sentence(subject(optimal, priority, cityNames), distanceKm, costPln, durationMinutes);
+        }
         return new Delta(
                 distanceKm,
                 durationMinutes,

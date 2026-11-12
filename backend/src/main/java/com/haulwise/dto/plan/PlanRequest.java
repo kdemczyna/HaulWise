@@ -22,9 +22,14 @@ public record PlanRequest(
         @NotNull @Size(min = 1, max = PlanRequest.MAX_IDS) List<Long> truckIds,
         @Schema(description = "Whether every truck drives back to the depot; default true")
         Boolean returnToDepot,
-        @Schema(description = "Local date-time without offset; default tomorrow 06:00",
-                example = "2026-11-13T06:00:00")
+        @Schema(implementation = String.class, pattern = PlanRequest.LOCAL_DATE_TIME_PATTERN,
+                example = "2026-11-13T06:00:00",
+                description = "Local Europe/Warsaw date-time without offset or zone (e.g. 2026-11-13T06:00 or "
+                        + "2026-11-13T06:00:00); default tomorrow 06:00")
         LocalDateTime departureTime) {
+
+    /** Documented shape of {@code departureTime}; the strict deserializer in {@code JacksonConfig} enforces it. */
+    static final String LOCAL_DATE_TIME_PATTERN = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?$";
 
     /** Largest number of shipment or truck ids in one request (ARCHITECTURE 7). */
     public static final int MAX_IDS = 200;

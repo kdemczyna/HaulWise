@@ -231,7 +231,9 @@ class PlannerTest {
         assertThat(result.optimal().totals()).isEqualTo(Totals.ZERO);
         assertThat(result.unassigned()).extracting(Unassigned::reason)
                 .containsExactly(UnassignedReason.EXCEEDS_LARGEST_TRUCK);
-        assertThat(result.delta().sentence()).isEqualTo("Respecting priorities costs nothing extra.");
+        assertThat(result.delta().noExtraCost()).isTrue();
+        assertThat(result.delta().sentence())
+                .isEqualTo("No shipments could be loaded onto the selected trucks, so there is nothing to compare.");
     }
 
     @Test

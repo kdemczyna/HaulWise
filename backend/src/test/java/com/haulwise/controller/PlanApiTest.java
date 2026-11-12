@@ -329,6 +329,26 @@ class PlanApiTest {
     }
 
     @Test
+    void nothingLoadedSaysThereIsNothingToCompare() throws Exception {
+        Truck small = trucks.save(new Truck("WX 4004D", 10, 6000, 18, 5, 40));
+        Shipment heavy = shipment("PO-1", bstadt, 8, 30000, Priority.NORMAL, false, null);
+
+        createPlan(request(depot.getId(), List.of(heavy.getId()), List.of(small.getId()), true, DEPARTURE))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.optimal.routes", hasSize(0)))
+                .andExpect(jsonPath("$.priority.routes", hasSize(0)))
+                .andExpect(jsonPath("$.optimal.totals.costPln").value(0.0))
+                .andExpect(jsonPath("$.delta.costPln").value(0.0))
+                .andExpect(jsonPath("$.delta.noExtraCost").value(true))
+                .andExpect(jsonPath("$.delta.sentence").value(
+                        "No shipments could be loaded onto the selected trucks, so there is nothing to compare."))
+                .andExpect(jsonPath("$.unassigned[0].reference").value("PO-1"))
+                .andExpect(jsonPath("$.unassigned[0].reason").value("EXCEEDS_LARGEST_TRUCK"))
+                .andExpect(jsonPath("$.unassigned[0].message")
+                        .value("30000 kg exceed the largest payload of the selected trucks (6000 kg)."));
+    }
+
+    @Test
     void missingFieldsAndEmptyListsReturn400WithAllFieldErrors() throws Exception {
         createPlan("{\"shipmentIds\": []}")
                 .andExpect(status().isBadRequest())

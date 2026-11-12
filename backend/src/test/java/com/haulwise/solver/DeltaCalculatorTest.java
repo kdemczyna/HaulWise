@@ -37,6 +37,17 @@ class DeltaCalculatorTest {
     private final DeltaCalculator calculator = new DeltaCalculator();
 
     @Test
+    void noLoadedTruckMeansNothingToCompare() {
+        Delta delta = calculator.calculate(variant(Mode.OPTIMAL), variant(Mode.PRIORITY), CITIES);
+
+        assertThat(delta.costPln()).isZero();
+        assertThat(delta.distanceKm()).isZero();
+        assertThat(delta.noExtraCost()).isTrue();
+        assertThat(delta.sentence())
+                .isEqualTo("No shipments could be loaded onto the selected trucks, so there is nothing to compare.");
+    }
+
+    @Test
     void deltaIsPriorityMinusOptimalForEveryValue() {
         Totals optimal = new Totals(100, 90, 60, 30, 186, 112.5);
         Totals priority = new Totals(138, 131, 60, 42.4, 262.88, 143.25);

@@ -132,9 +132,20 @@ public class OpenApiConfig {
                 && operation.getParameters().stream().anyMatch(parameter -> "path".equals(parameter.getIn()));
     }
 
+    /**
+     * POST/PUT bodies and non-string parameters can be malformed or invalid. A string path parameter (a plan id)
+     * accepts any value, so an operation with only that cannot answer 400.
+     */
     private static boolean acceptsInput(PathItem.HttpMethod method, Operation operation) {
         return method == PathItem.HttpMethod.POST || method == PathItem.HttpMethod.PUT
-                || operation.getParameters() != null && !operation.getParameters().isEmpty();
+                || operation.getParameters() != null && operation.getParameters().stream()
+                        .anyMatch(parameter -> !"path".equals(parameter.getIn()) || !isString(parameter.getSchema()));
+    }
+
+    private static boolean isString(Schema<?> schema) {
+        // OpenAPI 3.1 models keep the type in getTypes(); 3.0 models in getType()
+        return schema != null && ("string".equals(schema.getType())
+                || schema.getTypes() != null && schema.getTypes().contains("string"));
     }
 
     private static void addIfAbsent(ApiResponses responses, String code, String description) {
