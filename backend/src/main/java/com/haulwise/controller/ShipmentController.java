@@ -6,7 +6,6 @@ import com.haulwise.dto.ShipmentResponse;
 import com.haulwise.service.ShipmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +20,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Shipment CRUD. Request bodies are validated by {@link ShipmentService} (not {@code @Valid}) so field
+ * ranges and warehouse references are reported in one 400.
+ */
 @RestController
 @Tag(name = "Shipments", description = "Orders to deliver from a depot")
 @RequestMapping("/api/shipments")
@@ -48,14 +51,14 @@ public class ShipmentController {
     @Operation(summary = "Create a shipment")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // OpenAPI only; the runtime status comes from ResponseEntity
-    public ResponseEntity<ShipmentResponse> create(@Valid @RequestBody ShipmentRequest request) {
+    public ResponseEntity<ShipmentResponse> create(@RequestBody ShipmentRequest request) {
         ShipmentResponse created = shipmentService.create(request);
         return ResponseEntity.created(Locations.of(created.id())).body(created);
     }
 
     @Operation(summary = "Update a shipment")
     @PutMapping("/{id}")
-    public ShipmentResponse update(@PathVariable Long id, @Valid @RequestBody ShipmentRequest request) {
+    public ShipmentResponse update(@PathVariable Long id, @RequestBody ShipmentRequest request) {
         return shipmentService.update(id, request);
     }
 

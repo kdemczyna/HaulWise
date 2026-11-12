@@ -165,6 +165,29 @@ class WarehouseApiTest {
     }
 
     @Test
+    void innerWhitespaceIsCollapsedSoSpacedDuplicateReturns409() throws Exception {
+        mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("GDN \\t Port", "  Gdansk   Old  Town ", 54.35, 18.65)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("GDN Port"))
+                .andExpect(jsonPath("$.city").value("Gdansk Old Town"));
+
+        mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("  GDN   Port ", "Gdansk", 54.0, 18.0)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("A warehouse named 'GDN Port' already exists."));
+        assertThat(warehouses.count()).isEqualTo(1);
+    }
+
+    @Test
+    void noBreakSpacesAreCollapsedAndStripped() throws Exception {
+        mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("\\u00A0GDN\\u00A0\\u00A0Port\\u00A0", "Gdansk", 54.35, 18.65)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("GDN Port"));
+    }
+
+    @Test
     void updateReturnsUpdatedWarehouse() throws Exception {
         Warehouse waw = save("WAW Central", "Warsaw");
 

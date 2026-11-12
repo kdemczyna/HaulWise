@@ -3,6 +3,8 @@ package com.haulwise.exception;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import jakarta.validation.ConstraintViolationException;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -37,6 +39,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final int MAX_ECHOED_VALUE_LENGTH = 50;
+
+    private static final String LOCAL_DATE_TIME_EXPECTATION =
+            "must be a local date-time without offset, e.g. 2026-11-13T12:00:00";
 
     private static final Comparator<FieldViolation> BY_FIELD_THEN_MESSAGE =
             Comparator.comparing(FieldViolation::field).thenComparing(FieldViolation::message);
@@ -102,9 +107,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         String name = ex instanceof MethodArgumentTypeMismatchException mismatch
                 ? mismatch.getName() : ex.getPropertyName();
-        return problem(HttpStatus.BAD_REQUEST, "Malformed request",
-                "Parameter '" + name + "' has an invalid value: '" + abbreviate(ex.getValue()) + "'.",
-                ErrorCode.MALFORMED_REQUEST.name());
+        String detail = isEnum(ex.getRequiredType())
+                ? "Parameter '" + name + "' must be one of " + allowedValues(ex.getRequiredType()) + "."
+                : "Parameter '" + name + "' has an invalid value: '" + abbreviate(ex.getValue()) + "'.";
+        return problem(HttpStatus.BAD_REQUEST, "Malformed request", detail, ErrorCode.MALFORMED_REQUEST.name());
     }
 
     /** Adds the {@code code} property to problems built by Spring for framework exceptions. */
@@ -140,10 +146,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .filter(Objects::nonNull)
                     .collect(Collectors.joining("."));
             if (!field.isEmpty()) {
-                return "Field '" + field + "' has an invalid value or type.";
+                return "Field '" + field + "' " + expectation(mismatch.getTargetType()) + ".";
             }
         }
         return "Request body is missing or is not valid JSON.";
+    }
+
+    /** What a body field of the given type must look like; enums list their (case-sensitive) values. */
+    private static String expectation(Class<?> targetType) {
+        if (isEnum(targetType)) {
+            return "must be one of " + allowedValues(targetType);
+        }
+        if (LocalDateTime.class.equals(targetType)) {
+            return LOCAL_DATE_TIME_EXPECTATION;
+        }
+        return "has an invalid value or type";
+    }
+
+    private static boolean isEnum(Class<?> type) {
+        return type != null && type.isEnum();
+    }
+
+    private static String allowedValues(Class<?> enumType) {
+        return Arrays.stream(enumType.getEnumConstants())
+                .map(constant -> ((Enum<?>) constant).name())
+                .collect(Collectors.joining(", "));
     }
 
     private static String abbreviate(Object value) {

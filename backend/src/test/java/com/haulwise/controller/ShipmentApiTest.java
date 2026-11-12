@@ -2,6 +2,7 @@ package com.haulwise.controller;
 
 import static com.haulwise.controller.ApiTestIds.MISSING_ID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
@@ -23,6 +24,8 @@ import com.haulwise.repository.TruckRepository;
 import com.haulwise.repository.WarehouseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -131,12 +134,83 @@ class ShipmentApiTest {
     }
 
     @Test
-    void unknownPriorityInBodyReturns400Malformed() throws Exception {
+    void rangeAndWarehouseErrorsAreReportedTogether() throws Exception {
         mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
-                        .content(fullJson(waw.getId(), gdn.getId(), 5, "SUPER")))
+                        .content(fullJson(MISSING_ID, gdn.getId(), 101, "NORMAL")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Request has 2 invalid fields."))
+                .andExpect(jsonPath("$.errors[*].field").value(contains("originId", "pallets")))
+                .andExpect(jsonPath("$.errors[0].message").value("warehouse " + MISSING_ID + " does not exist"))
+                .andExpect(jsonPath("$.errors[1].message").value("must be less than or equal to 100"));
+        assertThat(shipments.count()).isZero();
+    }
+
+    @Test
+    void updateReportsRangeAndSameWarehouseErrorsTogether() throws Exception {
+        Shipment shipment = save("PO-1", waw, gdn, Priority.HIGH);
+
+        mvc.perform(put("/api/shipments/{id}", shipment.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(fullJson(waw.getId(), waw.getId(), 0, "NORMAL")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(contains("destinationId", "pallets")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SUPER", "urgent", "Low"})
+    void unknownPriorityInBodyReturns400ListingAllowedValues(String priority) throws Exception {
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content(fullJson(waw.getId(), gdn.getId(), 5, priority)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
-                .andExpect(jsonPath("$.detail").value("Field 'priority' has an invalid value or type."));
+                .andExpect(jsonPath("$.detail").value("Field 'priority' must be one of URGENT, HIGH, NORMAL."));
+    }
+
+    @Test
+    void numericPriorityInBodyReturns400ListingAllowedValues() throws Exception {
+        String body = """
+                {"reference": "PO-3002", "originId": %d, "destinationId": %d, "pallets": 2, "weightKg": 900,
+                 "priority": 1}
+                """.formatted(waw.getId(), gdn.getId());
+
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.detail").value("Field 'priority' must be one of URGENT, HIGH, NORMAL."));
+        assertThat(shipments.count()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-11-13T12:00:00Z", "2026-11-13T12:00:00+01:00",
+            "2026-11-13T12:00:00+01:00[Europe/Warsaw]", "2026-11-13", "13.11.2026 12:00"})
+    void deadlineWithOffsetZoneOrOtherFormatReturns400(String deadline) throws Exception {
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithDeadline("\"" + deadline + "\"")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.detail").value("Field 'deadline' must be a local date-time without offset, "
+                        + "e.g. 2026-11-13T12:00:00."));
+        assertThat(shipments.count()).isZero();
+    }
+
+    @Test
+    void numericDeadlineReturns400() throws Exception {
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithDeadline("1794567600")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    }
+
+    @Test
+    void localDeadlineWithoutSecondsIsAcceptedAndEmptyMeansNone() throws Exception {
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithDeadline("\"2026-11-13T12:00\"")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deadline").value("2026-11-13T12:00:00"));
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithDeadline("\"\"")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deadline").isEmpty());
     }
 
     @Test
@@ -155,11 +229,13 @@ class ShipmentApiTest {
                 .andExpect(jsonPath("$[0].destination.name").value("GDN Port"));
     }
 
-    @Test
-    void unknownPriorityFilterReturns400() throws Exception {
-        mvc.perform(get("/api/shipments").param("priority", "SUPER"))
+    @ParameterizedTest
+    @ValueSource(strings = {"SUPER", "urgent"})
+    void unknownPriorityFilterReturns400ListingAllowedValues(String priority) throws Exception {
+        mvc.perform(get("/api/shipments").param("priority", priority))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.detail").value("Parameter 'priority' must be one of URGENT, HIGH, NORMAL."));
     }
 
     @Test
@@ -197,6 +273,15 @@ class ShipmentApiTest {
     }
 
     @Test
+    void updateUnknownIdWithInvalidBodyReturns400BeforeNotFound() throws Exception {
+        mvc.perform(put("/api/shipments/{id}", MISSING_ID).contentType(MediaType.APPLICATION_JSON)
+                        .content(fullJson(waw.getId(), gdn.getId(), 101, "NORMAL")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("pallets"));
+    }
+
+    @Test
     void deleteReturns204AndUnknownIdReturns404() throws Exception {
         Shipment shipment = save("PO-1", waw, gdn, Priority.NORMAL);
 
@@ -209,6 +294,13 @@ class ShipmentApiTest {
         Shipment shipment = new Shipment(reference, origin, destination, 4, 1500);
         shipment.setPriority(priority);
         return shipments.save(shipment);
+    }
+
+    private String jsonWithDeadline(String deadlineJson) {
+        return """
+                {"reference": "PO-3001", "originId": %d, "destinationId": %d, "pallets": 2, "weightKg": 900,
+                 "deadline": %s}
+                """.formatted(waw.getId(), gdn.getId(), deadlineJson);
     }
 
     private static String fullJson(Long originId, Long destinationId, int pallets, String priority) {

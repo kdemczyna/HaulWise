@@ -10,7 +10,8 @@ import java.time.LocalDateTime;
 /**
  * Body of {@code POST/PUT /api/shipments}. Pallets and weight may exceed every truck (D-15) so the
  * planner can report them as unassigned. {@code priority} defaults to NORMAL, {@code pinnedFirst} to
- * false. The reference is stripped on construction. Existence of the warehouses and {@code originId != destinationId} are checked by the service.
+ * false. The reference is stripped on construction. Existence of the warehouses and
+ * {@code originId != destinationId} are checked by the service.
  */
 public record ShipmentRequest(
         @NotNull @Size(min = 1, max = 40) String reference,
