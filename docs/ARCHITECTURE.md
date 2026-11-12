@@ -474,6 +474,7 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 cd backend
 .\mvnw.cmd spring-boot:run          # API http://localhost:8080/api, Swagger http://localhost:8080/swagger-ui.html
 .\mvnw.cmd test                     # backend tests
+# macOS/Linux: sh mvnw spring-boot:run   (mvnw is committed without the executable bit on purpose - user decision)
 
 # Frontend (terminal 2)
 cd frontend
