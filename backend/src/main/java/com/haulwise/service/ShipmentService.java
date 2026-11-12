@@ -10,6 +10,7 @@ import com.haulwise.exception.NotFoundException;
 import com.haulwise.exception.RequestValidationException;
 import com.haulwise.repository.ShipmentRepository;
 import com.haulwise.repository.WarehouseRepository;
+import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -17,9 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Shipment CRUD. Origin and destination must exist and differ; violations are reported as field
- * errors on {@code originId} / {@code destinationId}. All mapping to DTOs happens inside the
- * transaction because the warehouse associations are lazy and open-in-view is off.
+ * Shipment CRUD. Requests are validated here in one round: the Bean Validation rules of
+ * {@link ShipmentRequest} plus "origin and destination exist and differ" (field errors on
+ * {@code originId} / {@code destinationId}), so a client sees every invalid field in one 400. All
+ * mapping to DTOs happens inside the transaction because the warehouse associations are lazy and
+ * open-in-view is off.
  */
 @Service
 @Transactional
@@ -27,10 +30,12 @@ public class ShipmentService {
 
     private final ShipmentRepository shipments;
     private final WarehouseRepository warehouses;
+    private final Validator validator;
 
-    public ShipmentService(ShipmentRepository shipments, WarehouseRepository warehouses) {
+    public ShipmentService(ShipmentRepository shipments, WarehouseRepository warehouses, Validator validator) {
         this.shipments = shipments;
         this.warehouses = warehouses;
+        this.validator = validator;
     }
 
     /** Shipments filtered by the optional priority and origin ({@code null} = any), ordered by id. */
@@ -45,7 +50,7 @@ public class ShipmentService {
     }
 
     public ShipmentResponse create(ShipmentRequest request) {
-        Route route = resolveRoute(request);
+        Route route = validate(request);
         Shipment shipment = new Shipment(request.reference(), route.origin(), route.destination(),
                 request.pallets(), request.weightKg());
         applyOptionalFields(shipment, request);
@@ -53,8 +58,8 @@ public class ShipmentService {
     }
 
     public ShipmentResponse update(Long id, ShipmentRequest request) {
+        Route route = validate(request);
         Shipment shipment = load(id);
-        Route route = resolveRoute(request);
         shipment.setReference(request.reference());
         shipment.setOrigin(route.origin());
         shipment.setDestination(route.destination());
@@ -72,23 +77,32 @@ public class ShipmentService {
         return shipments.findWithWarehousesById(id).orElseThrow(() -> new NotFoundException("Shipment", id));
     }
 
-    private Route resolveRoute(ShipmentRequest request) {
-        List<FieldViolation> violations = new ArrayList<>();
-        Optional<Warehouse> origin = warehouses.findById(request.originId());
-        Optional<Warehouse> destination = warehouses.findById(request.destinationId());
-        if (origin.isEmpty()) {
-            violations.add(missingWarehouse("originId", request.originId()));
-        }
-        if (destination.isEmpty()) {
-            violations.add(missingWarehouse("destinationId", request.destinationId()));
-        }
-        if (request.originId().equals(request.destinationId())) {
+    /** Collects field and route errors together; throws {@link RequestValidationException} if any. */
+    private Route validate(ShipmentRequest request) {
+        List<FieldViolation> violations = new ArrayList<>(validator.validate(request).stream()
+                .map(v -> new FieldViolation(v.getPropertyPath().toString(), v.getMessage()))
+                .toList());
+        Optional<Warehouse> origin = findWarehouse("originId", request.originId(), violations);
+        Optional<Warehouse> destination = findWarehouse("destinationId", request.destinationId(), violations);
+        if (request.originId() != null && request.originId().equals(request.destinationId())) {
             violations.add(new FieldViolation("destinationId", "must differ from originId"));
         }
         if (!violations.isEmpty()) {
             throw new RequestValidationException(violations);
         }
-        return new Route(origin.get(), destination.get());
+        return new Route(origin.orElseThrow(), destination.orElseThrow());
+    }
+
+    /** Looks up a referenced warehouse; a missing id is already reported by {@code @NotNull}. */
+    private Optional<Warehouse> findWarehouse(String field, Long id, List<FieldViolation> violations) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        Optional<Warehouse> warehouse = warehouses.findById(id);
+        if (warehouse.isEmpty()) {
+            violations.add(missingWarehouse(field, id));
+        }
+        return warehouse;
     }
 
     private static void applyOptionalFields(Shipment shipment, ShipmentRequest request) {

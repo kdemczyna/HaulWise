@@ -7,6 +7,7 @@ import com.haulwise.domain.LegSource;
 import com.haulwise.domain.RouteLeg;
 import com.haulwise.domain.Warehouse;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,22 @@ class RouteLegRepositoryTest {
         assertThat(there.getUpdatedAt()).isEqualTo(NOW);
         assertThat(back.getSource()).isEqualTo(LegSource.OSRM);
         assertThat(legs.findByFromWarehouseIdAndToWarehouseId(waw.getId(), ldz.getId())).isEmpty();
+    }
+
+    @Test
+    void findLegsBetweenReturnsIdProjectionsOfLegsInsideTheSet() {
+        legs.save(new RouteLeg(waw, krk, 295, 253, LegSource.SEEDED, NOW));
+        legs.save(new RouteLeg(krk, waw, 296.5, 255, LegSource.OSRM, NOW));
+        legs.save(new RouteLeg(krk, ldz, 275, 236, LegSource.SEEDED, NOW));
+        em.flush();
+        em.clear();
+
+        List<StoredLeg> found = legs.findLegsBetween(List.of(waw.getId(), krk.getId()));
+
+        assertThat(found).containsExactlyInAnyOrder(
+                new StoredLeg(waw.getId(), krk.getId(), 295, 253, LegSource.SEEDED),
+                new StoredLeg(krk.getId(), waw.getId(), 296.5, 255, LegSource.OSRM));
+        assertThat(legs.findLegsBetween(List.of(ldz.getId()))).isEmpty();
     }
 
     @Test

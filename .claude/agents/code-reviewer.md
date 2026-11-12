@@ -33,6 +33,14 @@ Each finding: `path:line` – what's wrong – why it matters – concrete sugge
 
 Finish with a short "What's good" note (1–3 bullets) and the commands you ran with their results.
 
+## Re-review mode (fix check)
+When the caller asks you to re-review fixes, you get the earlier findings. Then:
+1. Review only what changed since your review (`git diff`, untracked files) plus the code those changes touch.
+2. For each earlier Blocker/Major (and any Minor the caller lists), report **Resolved**, **Partially resolved**, or **Not resolved**, with `path:line` evidence.
+3. Report any **new** problem the fixes introduced, with the usual severities.
+4. Re-run the tests. Verdict: **APPROVE** only if every Blocker/Major is resolved, nothing new of Blocker/Major severity appeared, and tests pass; otherwise **CHANGES REQUESTED**.
+Keep the report short; don't repeat the full checklist.
+
 ## Rules
 - Do not modify files. Your output is the review; the developer applies fixes.
 - Be specific and actionable; no vague advice. Don't pad with nitpicks — prioritize what a reviewer of a recruitment task would actually notice.

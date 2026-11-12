@@ -6,6 +6,7 @@ import com.haulwise.dto.SettingsResponse;
 import com.haulwise.exception.FieldViolation;
 import com.haulwise.exception.RequestValidationException;
 import com.haulwise.repository.SettingsRepository;
+import com.haulwise.solver.model.CostParameters;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,18 @@ public class SettingsService {
 
     public SettingsResponse get() {
         return SettingsResponse.from(loadOrCreate());
+    }
+
+    /** Road factor and average speed for distance estimates; for other services, not the API. */
+    public EstimateParameters estimateParameters() {
+        Settings settings = loadOrCreate();
+        return new EstimateParameters(settings.getRoadFactor(), settings.getAverageSpeedKmh());
+    }
+
+    /** Diesel price and service time for the cost model (ARCHITECTURE 6.2); for other services, not the API. */
+    public CostParameters costParameters() {
+        Settings settings = loadOrCreate();
+        return new CostParameters(settings.getDieselPricePlnPerLitre(), settings.getServiceMinutesPerStop());
     }
 
     public SettingsResponse update(SettingsRequest request) {

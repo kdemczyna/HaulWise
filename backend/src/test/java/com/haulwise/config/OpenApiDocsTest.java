@@ -1,11 +1,21 @@
 package com.haulwise.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haulwise.HaulWiseApiTest;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,6 +30,9 @@ class OpenApiDocsTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Test
     void apiDocsDescribeTheApi() throws Exception {
         mvc.perform(get("/v3/api-docs"))
@@ -30,8 +43,34 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/trucks/{id}']").exists())
                 .andExpect(jsonPath("$.paths['/api/shipments']").exists())
                 .andExpect(jsonPath("$.paths['/api/settings'].get.summary").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/distances'].get.summary").isNotEmpty())
                 .andExpect(jsonPath("$.paths['/api/settings'].put.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/settings'].put.responses['409']").doesNotExist());
+    }
+
+    @Test
+    void descriptionNamesEveryResourceAndTagsAreInResourceOrder() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath("$.info.description", containsString("warehouses, trucks and shipments")))
+                .andExpect(jsonPath("$.info.description", containsString("settings")))
+                .andExpect(jsonPath("$.info.description", containsString("distance")))
+                .andExpect(jsonPath("$.tags[*].name")
+                        .value(contains("Warehouses", "Trucks", "Shipments", "Settings", "Distances")))
+                .andExpect(jsonPath("$.tags[*].description").value(everyItem(not(emptyOrNullString()))));
+    }
+
+    @Test
+    void collectionPathComesBeforeItemPathSoOperationsReadListCreateGetUpdateDelete() throws Exception {
+        String json = mvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
+        JsonNode paths = objectMapper.readTree(json).get("paths");
+        List<String> pathOrder = new ArrayList<>();
+        paths.fieldNames().forEachRemaining(pathOrder::add);
+        List<String> itemMethods = new ArrayList<>();
+        paths.get("/api/warehouses/{id}").fieldNames().forEachRemaining(itemMethods::add);
+
+        assertThat(pathOrder).isSorted();
+        assertThat(pathOrder.indexOf("/api/warehouses")).isLessThan(pathOrder.indexOf("/api/warehouses/{id}"));
+        assertThat(itemMethods).containsExactly("get", "put", "delete");
     }
 
     @Test

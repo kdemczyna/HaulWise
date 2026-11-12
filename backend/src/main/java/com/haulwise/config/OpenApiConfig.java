@@ -6,6 +6,7 @@ import com.haulwise.controller.ConflictResponse;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
@@ -16,6 +17,11 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +29,9 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * API metadata for the Swagger UI ({@code /swagger-ui.html}) plus the shared problem+json error shape
- * (D-12), attached to the error responses every operation can return.
+ * (D-12), attached to the error responses every operation can return. Tags and paths are ordered so
+ * the UI (no sorters configured, it keeps the spec order) shows the resources in a fixed order and
+ * each resource's operations as list, create, get, update, delete.
  */
 @Configuration
 public class OpenApiConfig {
@@ -35,13 +43,45 @@ public class OpenApiConfig {
 
     private static final String PROBLEM_SCHEMA = "Problem";
 
+    /** Order of the tags declared on the controllers; tags not listed here follow in their own order. */
+    static final List<String> TAG_ORDER = List.of("Warehouses", "Trucks", "Shipments", "Settings", "Distances");
+
     @Bean
     OpenAPI haulWiseOpenApi() {
         return new OpenAPI().info(new Info()
                 .title(TITLE)
                 .version(API_VERSION)
-                .description("Warehouses, trucks and shipments for planning delivery runs. "
-                        + "Errors use RFC 9457 problem+json with a machine-readable `code`."));
+                .description("Plan delivery runs: manage warehouses, trucks and shipments, tune the cost "
+                        + "settings and inspect the distance matrix between warehouses. Date-times are local "
+                        + "Europe/Warsaw times without offset. Errors use RFC 9457 problem+json with a "
+                        + "machine-readable `code`."));
+    }
+
+    /**
+     * Sorts the tags by {@link #TAG_ORDER} and the paths by key. Within a path item operations are written
+     * as GET, PUT, POST, DELETE, so {@code /api/x} (list, create) followed by {@code /api/x/{id}}
+     * (get, update, delete) gives the intended operation order.
+     */
+    @Bean
+    OpenApiCustomizer tagAndPathOrderCustomizer() {
+        return openApi -> {
+            if (openApi.getTags() != null) {
+                openApi.setTags(openApi.getTags().stream()
+                        .sorted(Comparator.comparingInt(tag -> tagRank(tag.getName())))
+                        .collect(Collectors.toCollection(ArrayList::new)));
+            }
+            Paths sorted = new Paths();
+            openApi.getPaths().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> sorted.addPathItem(entry.getKey(), entry.getValue()));
+            sorted.setExtensions(openApi.getPaths().getExtensions());
+            openApi.setPaths(sorted);
+        };
+    }
+
+    private static int tagRank(String name) {
+        int index = TAG_ORDER.indexOf(name);
+        return index < 0 ? TAG_ORDER.size() : index;
     }
 
     /** Documents the 409 declared with {@link ConflictResponse} next to the generated success response. */

@@ -126,10 +126,10 @@ Each task is about 1-3 hours.
 - [x] **T-02** Domain model + H2 config + repositories: Warehouse, Truck, Shipment, Settings; layered packages (controller / service / repository / dto / solver). (Must)
 - [x] **T-03** CRUD REST API for warehouses, trucks, shipments: DTOs, validation, global error handler, correct status codes (409 on referenced delete). (Must)
 - [x] **T-04** CORS config (env-driven allowed origins) and OpenAPI/Swagger page. (Must)
-- [ ] **T-05** Distance/time matrix: seeded matrix between 8-10 Polish cities, `DistanceProvider` interface, haversine x road-factor fallback. (Must)
-- [ ] **T-06** Fuel and cost model as a pure class + unit tests (load-dependent consumption, driver time, cost). (Must)
+- [x] **T-05** Distance/time matrix: seeded matrix between 8-10 Polish cities, `DistanceProvider` interface, haversine x road-factor fallback. (Must)
+- [x] **T-06** Fuel and cost model as a pure class + unit tests (load-dependent consumption, driver time, cost). (Must)
 - [x] **T-07** Settings API (diesel price, average speed, priority weights, compliance limits) with Polish defaults. (Must)
-- [ ] **T-08** Seed loader: warehouses, trucks, a realistic set of shipments. (Must)
+- [x] **T-08** Seed loader: warehouses, trucks, a realistic set of shipments. (Must)
 
 **Day 1 milestone:** CRUD works via Swagger/curl, CORS verified, matrix queryable, cost model tested.
 
@@ -150,7 +150,7 @@ Each task is about 1-3 hours.
 - [ ] **T-18** Backend API tests (MockMvc: CRUD, validation, 409, CORS, plan endpoint). (Must)
 - [ ] **T-19** Frontend tests (Vitest/RTL, small set: forms, delta display, warnings). (Must)
 - [ ] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
-- [ ] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work. (Must)
+- [ ] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
 - [ ] **T-22** EU driving-time compliance check (verify rules, configurable) + UI warning. (Should)
 - [ ] **T-23** Load consolidation suggestion with saving. (Should)
 - [ ] **T-24** Feature flag endpoint + AI order parsing (Claude API, key from env). Key set but model empty = AI disabled (or default the model). (Should)

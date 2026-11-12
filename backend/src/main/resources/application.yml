@@ -23,6 +23,8 @@ spring:
     deserialization:
       # 20.7 for an integer field is a 400, not silently truncated to 20
       accept-float-as-int: false
+      # "priority": 1 is a 400 listing the allowed values, not silently the enum at index 1
+      fail-on-numbers-for-enums: true
 
 springdoc:
   default-produces-media-type: application/json

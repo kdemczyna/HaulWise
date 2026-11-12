@@ -52,11 +52,11 @@ public class Truck {
     }
 
     /**
-     * Normalises a plate the way it is stored (trimmed, inner whitespace collapsed to one space,
-     * upper-case), so lookups and uniqueness checks agree with it.
+     * Normalises a plate the way it is stored (whitespace runs, incl. no-break spaces, collapsed to one
+     * space, stripped, upper-case), so lookups and uniqueness checks agree with it.
      */
     public static String normalisePlate(String plate) {
-        return plate == null ? null : plate.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+        return plate == null ? null : plate.replaceAll("(?U)\\s+", " ").strip().toUpperCase(Locale.ROOT);
     }
 
     public Long getId() {
