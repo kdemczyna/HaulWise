@@ -1,9 +1,59 @@
 body {
   margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+}
+
+.hw-shell {
+  --app-shell-border-color: var(--hw-color-border);
+}
+
+.hw-shell-main {
+  background-color: var(--hw-color-page);
+}
+
+.hw-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  color: var(--hw-color-text);
+  font-weight: 700;
+  font-size: var(--mantine-font-size-lg);
+  text-decoration: none;
+}
+
+.hw-brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--mantine-radius-md);
+  background-color: var(--hw-color-brand);
+  color: var(--hw-color-surface);
+  font-size: var(--mantine-font-size-md);
+}
+
+.hw-nav-link {
+  --nl-bg: var(--hw-color-brand-light);
+  --nl-hover: var(--hw-color-brand-light);
+  --nl-color: var(--hw-color-brand-dark);
+  border-radius: var(--mantine-radius-md);
+}
+
+.hw-nav-link[data-active] .mantine-NavLink-label {
+  font-weight: 600;
+}
+
+.skip-link {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  left: var(--mantine-spacing-xs);
+  z-index: 1000;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-md);
+  background: var(--hw-color-surface);
+  color: var(--hw-color-brand);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
 }
