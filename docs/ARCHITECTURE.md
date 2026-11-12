@@ -104,7 +104,7 @@ HaulWise/
       application.yml
       seed/warehouses.csv  seed/matrix.csv  seed/trucks.csv  seed/shipments.csv
     src/test/java/com/haulwise/
-      solver/      *Test (pure unit tests, no Spring context)
+      solver/      *Test (pure unit tests, no Spring context), SolverPurityTest (architecture guard)
       controller/  *ApiTest (@SpringBootTest + @AutoConfigureMockMvc)
   frontend/
     package.json  vite.config.js (incl. Vitest config)  .oxlintrc.json  index.html  .env.example
@@ -195,7 +195,9 @@ erDiagram
 | **Truck** | `plate` 2..15, unique, uppercase normalised; `capacityPallets` 1..40; `payloadKg` 1..40000; `baseConsumptionLPer100Km` (0,100]; `extraConsumptionFullLoadLPer100Km` [0,50]; `driverCostPlnPerHour` [0,1000] |
 | **Shipment** | `reference` 1..40 (e.g. "PO-1042"); `origin`, `destination` ManyToOne LAZY, not null, `origin != destination`; `pallets` 1..100; `weightKg` 1..100000 (above-capacity values are allowed so the solver can report them unassigned); `priority` enum `URGENT|HIGH|NORMAL` default NORMAL; `deadline` `LocalDateTime` nullable (Europe/Warsaw implied, D-10); `pinnedFirst` boolean default false. Index on `origin_id`, `priority` |
 | **RouteLeg** | Directed pair (both directions stored), unique `(from_id, to_id)`; `distanceKm` > 0; `durationMinutes` > 0; `source` `SEEDED|OSRM`. Estimated (haversine) legs are **never stored** (D-06) |
-| **Settings** | Single row, id = 1, created by seed with defaults (section 6.4). Validated on PUT |
+| **Settings** | Single row, id = 1, created on first access by `SettingsService` (or by the seed) with the section 6.4 defaults. Validated on PUT |
+
+Mapping notes (T-02): entities only carry DB-level constraints (`nullable`, `length`, unique `warehouse.name`, unique `truck.plate`, `route_leg (from_id, to_id)`, check `shipment.origin_id <> destination_id`); range rules live on the request DTOs (section 7). `Truck` normalises its plate (trim, inner whitespace collapsed to one space, upper-case; `Truck.normalisePlate`). `RouteLeg` fields are named `fromWarehouse` / `toWarehouse` (columns `from_id` / `to_id`) because `from`/`to` are JPQL keywords. `Settings.withDefaults()` is the single source of the section 6.4 defaults. Repository queries prepared for T-03/T-05: `WarehouseRepository.existsByNameIgnoreCase[AndIdNot]`, `TruckRepository.existsByPlate[AndIdNot]`, `ShipmentRepository.search(priority?, originId?)` (fetch-joins origin/destination) and `countReferencingWarehouse(id)`, `ShipmentRepository.findWithWarehousesById(id)` (entity graph on origin/destination), `RouteLegRepository.findByFromWarehouseIdAndToWarehouseId` and `deleteByWarehouseId(id)` (flushes first, does not clear the persistence context, so a warehouse edited in the same transaction keeps its changes). With open-in-view off, map `Shipment` to DTOs inside `@Transactional(readOnly = true)` service methods or use `findWithWarehousesById` / `search`.
 
 Deletion rules: deleting a Warehouse referenced by any Shipment -> **409**; otherwise its RouteLegs are deleted first in the same transaction. Updating a Warehouse's lat/lon deletes its stored legs (they would be stale), so it falls back to estimates until an OSRM refresh. Trucks and shipments are freely deletable (plans are snapshots, D-05).
 
@@ -246,7 +248,7 @@ Base path `/api`. JSON only. Times are ISO-8601 local date-times (`"2026-11-13T0
 }
 ```
 
-`code` values: `VALIDATION_FAILED` (400), `MALFORMED_REQUEST` (400, unreadable JSON / bad enum / type mismatch), `NOT_FOUND` (404), `CONFLICT` (409), `FEATURE_DISABLED` (503), `UPSTREAM_UNAVAILABLE` (502), `INTERNAL_ERROR` (500, generic message, details only in logs). `errors` present only for validation. `GlobalExceptionHandler` (`@RestControllerAdvice`) handles `MethodArgumentNotValidException`, `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `ConstraintViolationException`, own exceptions, and a catch-all. Set `spring.mvc.problemdetails.enabled=true` so framework errors (405, 415, 404 no handler) also use the shape.
+`code` values: `VALIDATION_FAILED` (400), `MALFORMED_REQUEST` (400, unreadable JSON / bad enum / type mismatch), `NOT_FOUND` (404), `CONFLICT` (409), `FEATURE_DISABLED` (503), `UPSTREAM_UNAVAILABLE` (502), `INTERNAL_ERROR` (500, generic message, details only in logs). Other framework statuses use the `HttpStatus` name as `code` (e.g. 405 `METHOD_NOT_ALLOWED`, 415 `UNSUPPORTED_MEDIA_TYPE`). `errors[]` is sorted by field, then message (T-03). `errors` present only for validation. `GlobalExceptionHandler` (`@RestControllerAdvice`) handles `MethodArgumentNotValidException`, `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `ConstraintViolationException`, own exceptions, and a catch-all. Set `spring.mvc.problemdetails.enabled=true` so framework errors (405, 415, 404 no handler) also use the shape.
 
 ### 5.2 Status codes
 
@@ -271,12 +273,16 @@ Base path `/api`. JSON only. Times are ISO-8601 local date-times (`"2026-11-13T0
 `ShipmentRequest {reference, originId, destinationId, pallets, weightKg, priority, deadline|null, pinnedFirst}`.
 `Shipment {id, reference, origin:{id,name,city}, destination:{id,name,city}, pallets, weightKg, priority, deadline, pinnedFirst}` (embedded summaries save the UI a join).
 
+Implementation notes (T-03): DTO records are `WarehouseRequest/Response`, `WarehouseSummary`, `TruckRequest/Response`, `ShipmentRequest/Response` (all numeric request fields are boxed + `@NotNull`, so a missing value is a field error, not 0). `ShipmentRequest.priority` (null -> `NORMAL`) and `pinnedFirst` (null -> false) are optional. Request records clean their text in the compact constructor, so Bean Validation checks the cleaned value: warehouse name/city and shipment reference are stripped, truck plates go through `Truck.normalisePlate` (text fields use `@NotNull` + `@Size`, so blank input yields one size error). Warehouses are listed by name and trucks by plate (both case-insensitive), shipments by id. Service-level field errors are thrown as `RequestValidationException(List<FieldViolation>)`; shipment existence and `origin != destination` errors are collected together.
+
 **Settings** (T-07)
 | GET | `/api/settings` | `200 Settings` |
 |---|---|---|
 | PUT | `/api/settings` | full `Settings` body -> `200` / 400 |
 
 `Settings {dieselPricePlnPerLitre, averageSpeedKmh, roadFactor, serviceMinutesPerStop, urgentWeightPlnPerHour, highWeightPlnPerHour, complianceEnabled, maxContinuousDrivingMinutes, breakMinutes, maxDailyDrivingMinutes, consolidationFillThresholdPct}`.
+
+Implementation notes (T-07): records `SettingsRequest` / `SettingsResponse` (no `id` in either; all request fields boxed + `@NotNull`, PUT is a full replace). Ranges: `dieselPricePlnPerLitre` (0, 50]; `averageSpeedKmh` [10, 90] (EU truck speed limiter); `roadFactor` [1.0, 3.0] (road km >= great-circle km); `serviceMinutesPerStop` 0..480; `urgentWeightPlnPerHour`, `highWeightPlnPerHour` [0, 10000]; `maxContinuousDrivingMinutes` 30..900; `breakMinutes` 15..180; `maxDailyDrivingMinutes` 60..900; `consolidationFillThresholdPct` 1..100. Cross-field rules in `SettingsService` (field errors via `RequestValidationException`, reported together): `urgentWeightPlnPerHour >= highWeightPlnPerHour` (URGENT never weighs less than HIGH) and `maxContinuousDrivingMinutes <= maxDailyDrivingMinutes`. Both are checked whether or not compliance is enabled. GET creates the row with `Settings.withDefaults()` when it is missing, so it runs in a read-write transaction. A 409 is only possible on a concurrent first access to an empty table (PK race on id 1, caught by the DataIntegrity backstop); it is intentionally not documented in OpenAPI. Fractional values for integer fields are rejected as `MALFORMED_REQUEST` (`spring.jackson.deserialization.accept-float-as-int: false`, applies to all endpoints). No reset endpoint (not in the contract).
 
 **Distances** (T-05, T-26)
 | GET | `/api/distances` | `200 {warehouses:[{id,name}], legs:[{fromId,toId,distanceKm,durationMinutes,source:"SEEDED"|"OSRM"|"ESTIMATED"}]}` - complete n x (n-1) matrix, gaps filled with estimates |
@@ -425,7 +431,7 @@ OSRM (optional, T-26): `POST /api/distances/refresh` calls `GET {osrmBaseUrl}/ta
 
 ## 7. Cross-cutting concerns
 
-- **Validation**: Bean Validation on request records (`@NotBlank`, `@Size`, `@DecimalMin/Max`, `@Positive`, `@NotNull`, `@NotEmpty`); cross-field and existence checks in services, thrown as a `ValidationException(field, message)` mapped to the same 400 shape. Client-side validation mirrors the main rules via `@mantine/form`; server errors are mapped onto form fields with `form.setErrors(fieldErrors)`.
+- **Validation**: Bean Validation on request records (`@NotBlank`, `@Size`, `@DecimalMin/Max`, `@Positive`, `@NotNull`, `@NotEmpty`); cross-field and existence checks in services, thrown as a `RequestValidationException(field, message)` mapped to the same 400 shape. Client-side validation mirrors the main rules via `@mantine/form`; server errors are mapped onto form fields with `form.setErrors(fieldErrors)`.
 - **CORS** (T-04): `CorsConfig implements WebMvcConfigurer`, mapping `/api/**`, origins from `haulwise.cors.allowed-origins` (env `HAULWISE_CORS_ALLOWED_ORIGINS`, comma-separated, default `http://localhost:5173,http://127.0.0.1:5173`), methods `GET,POST,PUT,DELETE,OPTIONS`, headers `Content-Type,Accept`, exposed header `Location`, `allowCredentials=false`, `maxAge=3600`. No wildcard.
 - **Configuration**: `application.yml` with `${ENV:default}` placeholders, bound to a `HaulWiseProperties` record. Local secrets via `backend/.env` imported with `spring.config.import: optional:file:.env[.properties]` (git-ignored; `.env.example` committed). Keys: `ANTHROPIC_API_KEY`, `HAULWISE_AI_MODEL` (developer sets a current Claude model id from Anthropic docs at implementation time), `HAULWISE_CORS_ALLOWED_ORIGINS`, `HAULWISE_OSRM_BASE_URL` (default `https://router.project-osrm.org`), `HAULWISE_SEED_ENABLED`, `HAULWISE_H2_CONSOLE_ENABLED` (default `true`). Frontend: `frontend/.env` -> `VITE_API_BASE_URL` (default `http://localhost:8080/api`).
 - **Persistence settings**: `spring.jpa.hibernate.ddl-auto=create-drop`, `spring.jpa.open-in-view=false`, H2 console at `/h2-console`: enabled by default (`HAULWISE_H2_CONSOLE_ENABLED`), localhost-only (`web-allow-others` never set), disabled in tests. Tests use the shared `@HaulWiseApiTest` meta-annotation (seed off, console off, empty AI key, own `jdbc:h2:mem:test-<uuid>` DB per context) so a local `.env` cannot leak in. Transactions at service level (`@Transactional(readOnly = true)` on reads).
@@ -455,7 +461,7 @@ OSRM (optional, T-26): `POST /api/distances/refresh` calls `GET {osrmBaseUrl}/ta
 | Layer | Tool | What |
 |---|---|---|
 | Solver unit (T-06, T-09..12, T-22, T-23) | JUnit 5 + AssertJ, no Spring | Cost model hand-computed fixtures (33.0 L example); heavy-drop-first < reverse litres (US-5); brute force equals exhaustive optimum on fixtures; NN+2-opt never worse than NN; FFD: atomicity, kg and pallet limits, both unassigned reasons, priority-first packing; pin is position 1; pin conflict warning; URGENT moved earlier in PRIORITY mode; delta values + "no extra cost" + sentence text; determinism (same input twice = equal output); compliance break detection with 4.5 h / 9 h boundaries |
-| Architecture guard | plain JUnit | Scan `solver` source files: no `import org.springframework` / `jakarta.persistence` (cheap, makes the "pure solver" claim verifiable) |
+| Architecture guard | plain JUnit | Scan `solver` source files: no import (plain or `import static`) whose name starts with `org.springframework.`, `jakarta.persistence.`, `org.hibernate.` or `com.haulwise.domain.` (cheap, makes the "pure solver" claim verifiable; the solver has its own model, incl. `Priority`). Implemented in T-02 as `SolverPurityTest` |
 | API integration (T-18) | `@SpringBootTest` + `@AutoConfigureMockMvc`, H2, seed disabled (`@TestPropertySource(properties="haulwise.seed.enabled=false")`), fixtures created per test via repositories, `@Transactional` rollback or `deleteAll` in `@BeforeEach` | CRUD happy paths with 201 + Location / 204; 400 with `errors[]` shape; 404; 409 referenced warehouse delete and duplicate plate; 400 malformed JSON and bad enum; CORS: preflight `OPTIONS` with `Origin: http://localhost:5173` -> 200 + `Access-Control-Allow-Origin`, disallowed origin -> 403; `POST /api/plans` returns both variants + delta and `GET` by id; plan validation (shipment from another depot -> 400); `/api/features` with no key -> `ai:false`; AI endpoints -> 503 without key. Use `@MockitoBean` (not deprecated `@MockBean`) to stub `ClaudeClient`/`OsrmClient` |
 | Frontend (T-19) | Vitest + jsdom + RTL + user-event | `ShipmentForm` client validation and server field-error mapping; `DeltaBanner` text + "no extra cost" variant; `WarningsList` renders codes; `api/client` maps problem+json to `ApiError` (mock `fetch`). `RouteMap` is mocked in page tests (Leaflet does not render in jsdom). Setup file mocks `window.matchMedia` and `ResizeObserver` (required by Mantine) |
 | Manual / QA (T-29) | - | Clean clone, no `.env`, network off: CRUD, plan, map degradation |
@@ -524,11 +530,11 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 |---|---|
 | T-01 | See section 10 scaffold note; root `.gitignore`; `backend/.env.example`, `frontend/.env.example` |
 | T-02 | Entities in `domain/`; `Settings` single row; indexes per section 4; `RouteLeg` unique constraint |
-| T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4 |
-| T-04 | `CorsConfig` + `OpenApiConfig` (title, version); springdoc 2.8.17 |
-| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1 |
+| T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4. `GlobalExceptionHandler` also maps `DataIntegrityViolationException` to 409 `CONFLICT` as a backstop (the DB unique on `warehouse.name` is case-sensitive while the service check is case-insensitive; races). Add an API test "update warehouse coordinates -> GET returns the new values and no legs remain" |
+| T-04 | `CorsConfig` + `OpenApiConfig` (title, version); springdoc 2.8.17. Done: `HaulWiseProperties` (only the `cors` group so far; later tasks add theirs; wildcard/empty origins fail startup); controllers carry `@Tag`/`@Operation` summaries, `@ResponseStatus` (201/204, docs only - runtime status still comes from `ResponseEntity`) and `@ConflictResponse` (`controller` package; adds a documented 409); an `OpenApiCustomizer` adds a `Problem` schema and attaches it as `application/problem+json` to 400 (body or parameters), 404 (operations with a path parameter) and every other 4xx; `springdoc.default-produces/consumes-media-type: application/json`; API version `0.1.0` (matches the pom); origins `*` and `null` fail startup |
+| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1. Read `RouteLeg` from/to ids via a query projection or fetch join, not via lazy proxy id access |
 | T-06 | `RouteEvaluator` + `CostParameters`; tests incl. 33.0 L example and heavy-first |
-| T-07 | `GET/PUT /api/settings`; defaults section 6.4 |
+| T-07 | `GET/PUT /api/settings`; defaults section 6.4. `SettingsService` loads `findById(Settings.SINGLETON_ID).orElseGet(() -> save(Settings.withDefaults()))` |
 | T-08 | `SeedDataLoader` + CSVs; guarded by `haulwise.seed.enabled` |
 | T-09 | `BinPacker`, D-03, reasons |
 | T-10 | `StopGrouper`, `StopSequencer`; permutations via recursive swap with fixed pinned head |
