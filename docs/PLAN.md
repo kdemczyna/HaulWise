@@ -134,7 +134,7 @@ Each task is about 1-3 hours.
 **Day 1 milestone:** CRUD works via Swagger/curl, CORS verified, matrix queryable, cost model tested.
 
 ### Day 2 - Planner, priority, cost-of-priority, plan API, frontend CRUD, map
-- [ ] **T-09** Bin packing: first-fit-decreasing by priority then size, atomic shipments, unassigned reasons + unit tests. (Must)
+- [x] **T-09** Bin packing: first-fit-decreasing by priority then size, atomic shipments, unassigned reasons + unit tests. (Must)
 - [ ] **T-10** Stop ordering: brute-force permutations for 8 stops or fewer; nearest neighbour + 2-opt otherwise; optional return to depot + unit tests. (Must)
 - [ ] **T-11** Priority handling: weighted penalty plus hard pin-first + unit tests. (Must)
 - [ ] **T-12** Cost of priority: run optimal and priority plans, compute delta and plain-language text + unit tests. (Must)
