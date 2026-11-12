@@ -104,7 +104,7 @@ HaulWise/
       application.yml
       seed/warehouses.csv  seed/matrix.csv  seed/trucks.csv  seed/shipments.csv
     src/test/java/com/haulwise/
-      solver/      *Test (pure unit tests, no Spring context)
+      solver/      *Test (pure unit tests, no Spring context), SolverPurityTest (architecture guard)
       controller/  *ApiTest (@SpringBootTest + @AutoConfigureMockMvc)
   frontend/
     package.json  vite.config.js (incl. Vitest config)  .oxlintrc.json  index.html  .env.example
@@ -196,6 +196,8 @@ erDiagram
 | **Shipment** | `reference` 1..40 (e.g. "PO-1042"); `origin`, `destination` ManyToOne LAZY, not null, `origin != destination`; `pallets` 1..100; `weightKg` 1..100000 (above-capacity values are allowed so the solver can report them unassigned); `priority` enum `URGENT|HIGH|NORMAL` default NORMAL; `deadline` `LocalDateTime` nullable (Europe/Warsaw implied, D-10); `pinnedFirst` boolean default false. Index on `origin_id`, `priority` |
 | **RouteLeg** | Directed pair (both directions stored), unique `(from_id, to_id)`; `distanceKm` > 0; `durationMinutes` > 0; `source` `SEEDED|OSRM`. Estimated (haversine) legs are **never stored** (D-06) |
 | **Settings** | Single row, id = 1, created by seed with defaults (section 6.4). Validated on PUT |
+
+Mapping notes (T-02): entities only carry DB-level constraints (`nullable`, `length`, unique `warehouse.name`, unique `truck.plate`, `route_leg (from_id, to_id)`, check `shipment.origin_id <> destination_id`); range rules live on the request DTOs (section 7). `Truck` normalises its plate (trim, inner whitespace collapsed to one space, upper-case; `Truck.normalisePlate`). `RouteLeg` fields are named `fromWarehouse` / `toWarehouse` (columns `from_id` / `to_id`) because `from`/`to` are JPQL keywords. `Settings.withDefaults()` is the single source of the section 6.4 defaults. Repository queries prepared for T-03/T-05: `WarehouseRepository.existsByNameIgnoreCase[AndIdNot]`, `TruckRepository.existsByPlate[AndIdNot]`, `ShipmentRepository.search(priority?, originId?)` (fetch-joins origin/destination) and `countReferencingWarehouse(id)`, `ShipmentRepository.findWithWarehousesById(id)` (entity graph on origin/destination), `RouteLegRepository.findByFromWarehouseIdAndToWarehouseId` and `deleteByWarehouseId(id)` (flushes first, does not clear the persistence context, so a warehouse edited in the same transaction keeps its changes). With open-in-view off, map `Shipment` to DTOs inside `@Transactional(readOnly = true)` service methods or use `findWithWarehousesById` / `search`.
 
 Deletion rules: deleting a Warehouse referenced by any Shipment -> **409**; otherwise its RouteLegs are deleted first in the same transaction. Updating a Warehouse's lat/lon deletes its stored legs (they would be stale), so it falls back to estimates until an OSRM refresh. Trucks and shipments are freely deletable (plans are snapshots, D-05).
 
@@ -455,7 +457,7 @@ OSRM (optional, T-26): `POST /api/distances/refresh` calls `GET {osrmBaseUrl}/ta
 | Layer | Tool | What |
 |---|---|---|
 | Solver unit (T-06, T-09..12, T-22, T-23) | JUnit 5 + AssertJ, no Spring | Cost model hand-computed fixtures (33.0 L example); heavy-drop-first < reverse litres (US-5); brute force equals exhaustive optimum on fixtures; NN+2-opt never worse than NN; FFD: atomicity, kg and pallet limits, both unassigned reasons, priority-first packing; pin is position 1; pin conflict warning; URGENT moved earlier in PRIORITY mode; delta values + "no extra cost" + sentence text; determinism (same input twice = equal output); compliance break detection with 4.5 h / 9 h boundaries |
-| Architecture guard | plain JUnit | Scan `solver` source files: no `import org.springframework` / `jakarta.persistence` (cheap, makes the "pure solver" claim verifiable) |
+| Architecture guard | plain JUnit | Scan `solver` source files: no import (plain or `import static`) whose name starts with `org.springframework.`, `jakarta.persistence.`, `org.hibernate.` or `com.haulwise.domain.` (cheap, makes the "pure solver" claim verifiable; the solver has its own model, incl. `Priority`). Implemented in T-02 as `SolverPurityTest` |
 | API integration (T-18) | `@SpringBootTest` + `@AutoConfigureMockMvc`, H2, seed disabled (`@TestPropertySource(properties="haulwise.seed.enabled=false")`), fixtures created per test via repositories, `@Transactional` rollback or `deleteAll` in `@BeforeEach` | CRUD happy paths with 201 + Location / 204; 400 with `errors[]` shape; 404; 409 referenced warehouse delete and duplicate plate; 400 malformed JSON and bad enum; CORS: preflight `OPTIONS` with `Origin: http://localhost:5173` -> 200 + `Access-Control-Allow-Origin`, disallowed origin -> 403; `POST /api/plans` returns both variants + delta and `GET` by id; plan validation (shipment from another depot -> 400); `/api/features` with no key -> `ai:false`; AI endpoints -> 503 without key. Use `@MockitoBean` (not deprecated `@MockBean`) to stub `ClaudeClient`/`OsrmClient` |
 | Frontend (T-19) | Vitest + jsdom + RTL + user-event | `ShipmentForm` client validation and server field-error mapping; `DeltaBanner` text + "no extra cost" variant; `WarningsList` renders codes; `api/client` maps problem+json to `ApiError` (mock `fetch`). `RouteMap` is mocked in page tests (Leaflet does not render in jsdom). Setup file mocks `window.matchMedia` and `ResizeObserver` (required by Mantine) |
 | Manual / QA (T-29) | - | Clean clone, no `.env`, network off: CRUD, plan, map degradation |
@@ -524,11 +526,11 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 |---|---|
 | T-01 | See section 10 scaffold note; root `.gitignore`; `backend/.env.example`, `frontend/.env.example` |
 | T-02 | Entities in `domain/`; `Settings` single row; indexes per section 4; `RouteLeg` unique constraint |
-| T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4 |
+| T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4. `GlobalExceptionHandler` also maps `DataIntegrityViolationException` to 409 `CONFLICT` as a backstop (the DB unique on `warehouse.name` is case-sensitive while the service check is case-insensitive; races). Add an API test "update warehouse coordinates -> GET returns the new values and no legs remain" |
 | T-04 | `CorsConfig` + `OpenApiConfig` (title, version); springdoc 2.8.17 |
-| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1 |
+| T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1. Read `RouteLeg` from/to ids via a query projection or fetch join, not via lazy proxy id access |
 | T-06 | `RouteEvaluator` + `CostParameters`; tests incl. 33.0 L example and heavy-first |
-| T-07 | `GET/PUT /api/settings`; defaults section 6.4 |
+| T-07 | `GET/PUT /api/settings`; defaults section 6.4. `SettingsService` loads `findById(Settings.SINGLETON_ID).orElseGet(() -> save(Settings.withDefaults()))` |
 | T-08 | `SeedDataLoader` + CSVs; guarded by `haulwise.seed.enabled` |
 | T-09 | `BinPacker`, D-03, reasons |
 | T-10 | `StopGrouper`, `StopSequencer`; permutations via recursive swap with fixed pinned head |
