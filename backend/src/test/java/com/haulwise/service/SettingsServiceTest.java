@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.haulwise.HaulWiseApiTest;
 import com.haulwise.domain.Settings;
 import com.haulwise.repository.SettingsRepository;
+import com.haulwise.solver.model.CostParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,5 +38,20 @@ class SettingsServiceTest {
         settingsRepository.save(settings);
 
         assertThat(settingsService.estimateParameters()).isEqualTo(new EstimateParameters(1.45, 62));
+    }
+
+    @Test
+    void costParametersDefaultToPolishSettings() {
+        assertThat(settingsService.costParameters()).isEqualTo(new CostParameters(6.20, 30));
+    }
+
+    @Test
+    void costParametersReflectStoredSettings() {
+        Settings settings = Settings.withDefaults();
+        settings.setDieselPricePlnPerLitre(5.89);
+        settings.setServiceMinutesPerStop(20);
+        settingsRepository.save(settings);
+
+        assertThat(settingsService.costParameters()).isEqualTo(new CostParameters(5.89, 20));
     }
 }

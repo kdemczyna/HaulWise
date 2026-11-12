@@ -87,9 +87,11 @@ HaulWise/
       integration/   OsrmClient, ClaudeClient
       seed/          SeedDataLoader (ApplicationRunner)
       solver/        (pure Java, no Spring/JPA imports - enforced by review and a simple test, see 7)
-        model/       SolverInput, ShipmentItem, TruckSpec, CostParameters, PriorityWeights,
-                     ComplianceRules, DistanceMatrix, Mode (OPTIMAL|PRIORITY),
-                     SolverResult, PlanVariant, RoutePlan, StopPlan, Leg, Totals, Unassigned, Warning, Delta
+        model/       SolverInput, ShipmentItem, Priority (solver-side), TruckSpec, CostParameters, PriorityWeights,
+                     ComplianceRules, Mode (OPTIMAL|PRIORITY),
+                     DistanceProvider, DistanceMatrix, LegDistance, DistanceSource, DirectedPair, GeoPoint (T-05),
+                     RouteStop, Leg, Totals, RouteEvaluation (T-06),
+                     SolverResult, PlanVariant, RoutePlan, StopPlan, Unassigned, Warning, Delta
         Planner.java             # orchestrates the pipeline, runs both modes
         BinPacker.java           # T-09 first-fit-decreasing
         StopGrouper.java         # shipments -> stops (one per destination)
@@ -367,7 +369,8 @@ SolverInput(depot, shipments, trucks, matrix, costParams, priorityWeights, compl
        n <= 8 stops (configurable maxBruteForceStops): all permutations (pinned stop fixed at position 1)
        n > 8: nearest neighbour by distance (pinned first) then 2-opt on the objective until no improvement
        tie-break: lexicographically smaller warehouse-id sequence -> deterministic output
-  4. RouteEvaluator scores the chosen order (fuel, time, cost, arrivals, deadlines)
+  4. RouteEvaluator scores the chosen order (fuel, time, cost, arrival offsets in minutes after departure);
+     Planner (T-13) maps departureTime + arrivalMinutes to arrivalTime and deadlineMissed
   5. ComplianceChecker annotates warnings (T-22)
   6. Optimal-dominance guard: per truck, if the PRIORITY order happens to have lower cost than the OPTIMAL
      order (possible only with the heuristic), use it for OPTIMAL too -> delta is never negative
@@ -382,7 +385,7 @@ Per leg i (depot -> stop1 -> ... -> stopN [-> depot]):
 - `litres_i = distanceKm_i / 100 * (base + extraFullLoad * loadFraction_i)`
 - `drivingMinutes = sum(legDuration)`; `totalMinutes = driving + serviceMinutesPerStop * N` (+ compliance breaks are reported, not added - D-09).
 - `cost = litres * dieselPrice + (totalMinutes / 60) * driverCostPerHour`.
-- Arrival at stop k = departure + sum(leg durations up to k) + service * (k-1). `deadlineMissed = arrival > deadline`.
+- Arrival at stop k = departure + sum(leg durations up to k) + service * (k-1). RouteEvaluator returns the offset (`Leg.arrivalMinutes`); the Planner (T-13) adds `departureTime` and sets `deadlineMissed = arrival > deadline`.
 
 Worked check for tests: 100 km, base 28, extra 10, load 12000/24000 -> 100/100 * (28 + 5) = 33.0 L.
 
@@ -533,7 +536,7 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 | T-03 | Records + `from()` mappers; `GlobalExceptionHandler`; 201 + Location via `ServletUriComponentsBuilder`; 409 rules section 4. `GlobalExceptionHandler` also maps `DataIntegrityViolationException` to 409 `CONFLICT` as a backstop (the DB unique on `warehouse.name` is case-sensitive while the service check is case-insensitive; races). Add an API test "update warehouse coordinates -> GET returns the new values and no legs remain" |
 | T-04 | `CorsConfig` + `OpenApiConfig` (title, version); springdoc 2.8.17. Done: `HaulWiseProperties` (only the `cors` group so far; later tasks add theirs; wildcard/empty origins fail startup); controllers carry `@Tag`/`@Operation` summaries, `@ResponseStatus` (201/204, docs only - runtime status still comes from `ResponseEntity`) and `@ConflictResponse` (`controller` package; adds a documented 409); an `OpenApiCustomizer` adds a `Problem` schema and attaches it as `application/problem+json` to 400 (body or parameters), 404 (operations with a path parameter) and every other 4xx; `springdoc.default-produces/consumes-media-type: application/json`; API version `0.1.0` (matches the pom); origins `*` and `null` fail startup |
 | T-05 | `DistanceService`, `Haversine`, `GET /api/distances`; matrix CSV from section 4.1. Read `RouteLeg` from/to ids via a query projection or fetch join, not via lazy proxy id access. Done: solver side (pure) `solver/Haversine`, `solver/DistanceMatrixBuilder` (stored leg wins, else haversine x roadFactor at averageSpeedKmh), `solver/model/{DistanceProvider, DistanceMatrix, LegDistance, DistanceSource (SEEDED/OSRM/ESTIMATED), DirectedPair, GeoPoint}`; same warehouse = `LegDistance.ZERO` (not an estimate). Road factor and average speed come from the Settings row via `SettingsService.estimateParameters()` (internal record `EstimateParameters`; `SettingsResponse` is API-only; no `haulwise.solver.*` keys for them). `RouteLegRepository.findLegsBetween(ids)` returns `StoredLeg` id projections (JPQL constructor expression). `DistanceService.buildMatrix(ids)` (id order, unknown id -> `IllegalArgumentException`, callers validate first) and `getMatrix()` (all warehouses by name, legs row by row). DTO `DistanceMatrixResponse {warehouses:[{id,name}], legs:[{fromId,toId,distanceKm (1 dp),durationMinutes (int),source}]}`. `seed/matrix.csv` header `from,to,distance_km,duration_minutes`, warehouses by **name**, one row per unordered pair (36); `seed/MatrixCsvParser` validates it (`SeedDataException` with line number; strips a UTF-8 BOM; does not close the caller's `Reader`) and `MatrixCsvRow.reversed()` gives the other direction - persisting legs at startup is T-08 |
-| T-06 | `RouteEvaluator` + `CostParameters`; tests incl. 33.0 L example and heavy-first |
+| T-06 | `RouteEvaluator` + `CostParameters`; tests incl. 33.0 L example and heavy-first. Done: `solver/model/{CostParameters(dieselPricePlnPerLitre, serviceMinutesPerStop), TruckSpec(id, capacityPallets, payloadKg, baseConsumptionLPer100Km, extraConsumptionFullLoadLPer100Km, driverCostPlnPerHour), RouteStop(warehouseId, dropWeightKg), Leg, Totals, RouteEvaluation(stopLegs, Optional returnLeg, totals)}`; records validate nonsensical values (`IllegalArgumentException`). `new RouteEvaluator(DistanceProvider, CostParameters).evaluate(depotId, stops, truck, returnToDepot)`: rejects a stop at the depot, a warehouse twice and total drops above payload; empty route = no legs and `Totals.ZERO` (no depot->depot leg). Service time is charged at the leg's destination stop (never at the depot), so per-leg `driverCostPln = (driving + service) / 60 x rate` and leg values sum to the totals. `Leg.arrivalMinutes` is the offset from departure; RouteEvaluator does not check deadlines - **T-13 Planner maps departureTime + arrivalMinutes to arrivalTime and deadlineMissed**; minutes are `double` throughout the solver; model records share `Checks.requireNonNegative` (package-private); `Totals` adds `serviceMinutes` and derives `totalMinutes`/`costPln`; all values unrounded. Fuel and driver-cost rates are per truck (Truck entity), not settings; `SettingsService.costParameters()` maps the Settings row (diesel price, service minutes), like `estimateParameters()` - no `haulwise.solver.*` keys needed |
 | T-07 | `GET/PUT /api/settings`; defaults section 6.4. `SettingsService` loads `findById(Settings.SINGLETON_ID).orElseGet(() -> save(Settings.withDefaults()))` |
 | T-08 | `SeedDataLoader` + CSVs; guarded by `haulwise.seed.enabled`. Open `seed/matrix.csv` (and the other CSVs) with `StandardCharsets.UTF_8`; parse with `MatrixCsvParser` (caller owns and closes the `Reader`), resolve names to warehouses (unknown name -> fail startup) and store each row plus `reversed()` as `SEEDED` legs |
 | T-09 | `BinPacker`, D-03, reasons |
