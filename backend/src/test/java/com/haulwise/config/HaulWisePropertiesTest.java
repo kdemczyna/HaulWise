@@ -38,8 +38,32 @@ class HaulWisePropertiesTest {
     }
 
     @Test
+    void solverGroupDefaultsToEightBruteForceStops() {
+        HaulWiseProperties properties =
+                new HaulWiseProperties(new HaulWiseProperties.Cors(List.of("http://localhost:5173")), null);
+
+        assertThat(properties.solver().maxBruteForceStops()).isEqualTo(8);
+        assertThat(new HaulWiseProperties.Solver(null).maxBruteForceStops()).isEqualTo(8);
+    }
+
+    @Test
+    void bruteForceStopsWithinZeroToNineAreAccepted() {
+        assertThat(new HaulWiseProperties.Solver(0).maxBruteForceStops()).isZero();
+        assertThat(new HaulWiseProperties.Solver(9).maxBruteForceStops()).isEqualTo(9);
+    }
+
+    @Test
+    void bruteForceStopsOutsideZeroToNineFailStartup() {
+        assertThatThrownBy(() -> new HaulWiseProperties.Solver(10))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-brute-force-stops must be 0..9");
+        assertThatThrownBy(() -> new HaulWiseProperties.Solver(-1))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void missingCorsGroupIsRejected() {
-        assertThatThrownBy(() -> new HaulWiseProperties(null))
+        assertThatThrownBy(() -> new HaulWiseProperties(null, null))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

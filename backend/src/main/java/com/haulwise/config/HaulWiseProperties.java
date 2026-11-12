@@ -1,5 +1,6 @@
 package com.haulwise.config;
 
+import com.haulwise.solver.StopSequencer;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -8,11 +9,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * features that read them are implemented.
  */
 @ConfigurationProperties("haulwise")
-public record HaulWiseProperties(Cors cors) {
+public record HaulWiseProperties(Cors cors, Solver solver) {
 
     public HaulWiseProperties {
         if (cors == null) {
             throw new IllegalStateException("haulwise.cors.allowed-origins must be configured.");
+        }
+        if (solver == null) {
+            solver = new Solver(null);
         }
     }
 
@@ -38,6 +42,25 @@ public record HaulWiseProperties(Cors cors) {
 
         private static boolean isNotExplicit(String origin) {
             return origin.contains("*") || "null".equalsIgnoreCase(origin);
+        }
+    }
+
+    /**
+     * Solver tuning. {@code maxBruteForceStops} is the largest stop count per truck sequenced by trying every
+     * order (default {@value StopSequencer#DEFAULT_MAX_BRUTE_FORCE_STOPS}); above it nearest neighbour + 2-opt
+     * is used. Values outside 0..{@value StopSequencer#MAX_BRUTE_FORCE_STOPS_LIMIT} fail startup (10! orders
+     * would take too long per request).
+     */
+    public record Solver(Integer maxBruteForceStops) {
+
+        public Solver {
+            if (maxBruteForceStops == null) {
+                maxBruteForceStops = StopSequencer.DEFAULT_MAX_BRUTE_FORCE_STOPS;
+            }
+            if (maxBruteForceStops < 0 || maxBruteForceStops > StopSequencer.MAX_BRUTE_FORCE_STOPS_LIMIT) {
+                throw new IllegalStateException("haulwise.solver.max-brute-force-stops must be 0.."
+                        + StopSequencer.MAX_BRUTE_FORCE_STOPS_LIMIT + ", was " + maxBruteForceStops + ".");
+            }
         }
     }
 }

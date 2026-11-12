@@ -45,7 +45,13 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.paths['/api/settings'].get.summary").isNotEmpty())
                 .andExpect(jsonPath("$.paths['/api/distances'].get.summary").isNotEmpty())
                 .andExpect(jsonPath("$.paths['/api/settings'].put.responses['400']").exists())
-                .andExpect(jsonPath("$.paths['/api/settings'].put.responses['409']").doesNotExist());
+                .andExpect(jsonPath("$.paths['/api/settings'].put.responses['409']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/plans'].post.summary").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/plans'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/api/plans'].post.responses['400']"
+                        + ".content['application/problem+json'].schema.$ref").value(PROBLEM_REF))
+                .andExpect(jsonPath("$.paths['/api/plans/{id}'].get.responses['404']"
+                        + ".content['application/problem+json'].schema.$ref").value(PROBLEM_REF));
     }
 
     @Test
@@ -54,8 +60,9 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.info.description", containsString("warehouses, trucks and shipments")))
                 .andExpect(jsonPath("$.info.description", containsString("settings")))
                 .andExpect(jsonPath("$.info.description", containsString("distance")))
+                .andExpect(jsonPath("$.info.description", containsString("plan runs")))
                 .andExpect(jsonPath("$.tags[*].name")
-                        .value(contains("Warehouses", "Trucks", "Shipments", "Settings", "Distances")))
+                        .value(contains("Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans")))
                 .andExpect(jsonPath("$.tags[*].description").value(everyItem(not(emptyOrNullString()))));
     }
 

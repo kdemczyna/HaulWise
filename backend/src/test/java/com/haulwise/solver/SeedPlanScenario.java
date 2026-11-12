@@ -50,7 +50,7 @@ final class SeedPlanScenario {
     static List<ShipmentItem> shipments() {
         return List.of(
                 shipment(1041, LUB, 6, 3_600, Priority.URGENT, false, TOMORROW.withHour(20)),
-                shipment(1042, GDN, 10, 6_500, Priority.HIGH, true, null),
+                shipment(1042, GDN, 10, 6_500, Priority.HIGH, true, TOMORROW.withHour(12)),
                 shipment(1043, KRK, 6, 4_100, Priority.HIGH, false, TOMORROW.plusDays(1).withHour(12)),
                 shipment(1044, POZ, 16, 11_000, Priority.NORMAL, false, null),
                 shipment(1045, KRK, 14, 9_800, Priority.NORMAL, false, null),

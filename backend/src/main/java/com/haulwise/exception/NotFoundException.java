@@ -5,7 +5,7 @@ package com.haulwise.exception;
  */
 public class NotFoundException extends RuntimeException {
 
-    public NotFoundException(String resource, Long id) {
+    public NotFoundException(String resource, Object id) {
         super(resource + " " + id + " not found.");
     }
 }
