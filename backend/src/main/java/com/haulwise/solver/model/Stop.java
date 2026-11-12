@@ -39,6 +39,11 @@ public record Stop(
         Objects.requireNonNull(maxPriority, "maxPriority");
     }
 
+    /** The same stop with its pin cleared (used when another stop wins a pin conflict). */
+    public Stop unpinned() {
+        return new Stop(warehouseId, shipmentIds, dropPallets, dropWeightKg, maxPriority, false, earliestDeadline);
+    }
+
     /** The stop as input to the cost model. */
     public RouteStop toRouteStop() {
         return new RouteStop(warehouseId, dropWeightKg);

@@ -6,6 +6,7 @@ import com.haulwise.HaulWiseApiTest;
 import com.haulwise.domain.Settings;
 import com.haulwise.repository.SettingsRepository;
 import com.haulwise.solver.model.CostParameters;
+import com.haulwise.solver.model.PriorityWeights;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,5 +54,20 @@ class SettingsServiceTest {
         settingsRepository.save(settings);
 
         assertThat(settingsService.costParameters()).isEqualTo(new CostParameters(5.89, 20));
+    }
+
+    @Test
+    void priorityWeightsDefaultToSection64Values() {
+        assertThat(settingsService.priorityWeights()).isEqualTo(new PriorityWeights(150, 50));
+    }
+
+    @Test
+    void priorityWeightsReflectStoredSettings() {
+        Settings settings = Settings.withDefaults();
+        settings.setUrgentWeightPlnPerHour(220.5);
+        settings.setHighWeightPlnPerHour(0);
+        settingsRepository.save(settings);
+
+        assertThat(settingsService.priorityWeights()).isEqualTo(new PriorityWeights(220.5, 0));
     }
 }

@@ -1,5 +1,7 @@
 package com.haulwise.solver;
 
+import static com.haulwise.solver.TestMatrices.lineMatrix;
+import static com.haulwise.solver.TestMatrices.matrix;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
@@ -7,8 +9,6 @@ import static org.assertj.core.api.Assertions.within;
 import com.haulwise.solver.model.CostParameters;
 import com.haulwise.solver.model.DirectedPair;
 import com.haulwise.solver.model.DistanceMatrix;
-import com.haulwise.solver.model.DistanceSource;
-import com.haulwise.solver.model.LegDistance;
 import com.haulwise.solver.model.Priority;
 import com.haulwise.solver.model.RouteEvaluation;
 import com.haulwise.solver.model.SequencedRoute;
@@ -418,19 +418,6 @@ class StopSequencerTest {
         return new DirectedPair(from, to);
     }
 
-    /** Warehouse i + 1 at position x[i] on a line, 10 km per unit; minutes = km. */
-    private static DistanceMatrix lineMatrix(double... x) {
-        Map<DirectedPair, Double> km = new HashMap<>();
-        for (int i = 0; i < x.length; i++) {
-            for (int j = 0; j < x.length; j++) {
-                if (i != j) {
-                    km.put(pair(i + 1, j + 1), 10 * Math.abs(x[i] - x[j]));
-                }
-            }
-        }
-        return matrix(km);
-    }
-
     /** Warehouses 1..count at seeded random points in a 500 x 500 km square; Euclidean km, minutes = km. */
     private static DistanceMatrix randomPlaneMatrix(int count, long seed) {
         Random random = new Random(seed);
@@ -461,12 +448,5 @@ class StopSequencerTest {
             }
         }
         return matrix(km);
-    }
-
-    private static DistanceMatrix matrix(Map<DirectedPair, Double> km) {
-        Map<DirectedPair, LegDistance> legs = new HashMap<>();
-        km.forEach((pair, distance) -> legs.put(pair, new LegDistance(distance, distance, DistanceSource.ESTIMATED)));
-        List<Long> ids = km.keySet().stream().map(DirectedPair::fromId).distinct().sorted().toList();
-        return new DistanceMatrix(ids, legs);
     }
 }
