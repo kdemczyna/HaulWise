@@ -77,13 +77,16 @@ HaulWise/
                      HttpClientConfig (RestClient beans), ClockConfig (Clock bean, Europe/Warsaw),
                      ValidationConfig, JacksonConfig (strict local date-times)
       controller/    WarehouseController, TruckController, ShipmentController, SettingsController,
-                     DistanceController, PlanController, FeatureController, AiController
+                     DistanceController, PlanController, TruckRecommendationController (T-30),
+                     FeatureController, AiController
       service/       WarehouseService, TruckService, ShipmentService, SettingsService,
-                     DistanceService, PlanService, PlanStore, AiService
+                     DistanceService, PlanService, PlanStore, TruckRecommendationService (T-30), AiService
       repository/    WarehouseRepository, TruckRepository, ShipmentRepository,
                      RouteLegRepository, SettingsRepository
       domain/        Warehouse, Truck, Shipment, RouteLeg, Settings (JPA entities), Priority, LegSource (enums)
-      dto/           *Request / *Response records + static from(entity) mappers; plan/ sub-package for plan DTOs
+      dto/           *Request / *Response records + static from(entity) mappers; plan/ sub-package for plan DTOs;
+                     TruckRecommendationRequest/Response, RecommendedTruckResponse (T-30, reuses plan/'s
+                     TotalsResponse and UnassignedResponse)
       exception/     NotFoundException, ConflictException, UpstreamException, GlobalExceptionHandler
       integration/   OsrmClient, ClaudeClient
       seed/          SeedDataLoader (ApplicationRunner)
@@ -125,7 +128,7 @@ HaulWise/
       components/
         common/    AppLayout, PageHeader, LoadingState, ErrorState, EmptyState,
                    ConfirmDeleteModal, PriorityBadge, PinnedTag, ListView, TableBox, RowActions
-        forms/     WarehouseForm, TruckForm, ShipmentForm, AiOrderInput
+        forms/     WarehouseForm, TruckForm, ShipmentForm, SettingsForm (T-31), AiOrderInput
         plan/      PlanForm, PlanComparison, DeltaBanner, RouteCard, StopTimeline,
                    UtilisationBar, WarningsList, RouteMap, StopList
       pages/       PlanPage, PlanResultPage, ShipmentsPage, TrucksPage, WarehousesPage,
@@ -360,6 +363,30 @@ Plan response rules (T-13):
 - `pinned` (stop) = this stop carries the truck's kept pin-first request (after PIN_CONFLICT resolution); the flag is the same in both variants. Only PRIORITY forces the stop first; OPTIMAL ignores pins, so in OPTIMAL a pinned stop may be at any position (seed demo: Gdansk is stop 4 in OPTIMAL, stop 1 in PRIORITY).
 - `colorIndex` = position of the truck in the plan (same in both variants). `unassigned[].reference` comes from the shipment.
 
+**Recommendations** (T-30, US-14 - Extra)
+| POST | `/api/trucks/recommend` | `TruckRecommendationRequest` -> `200 TruckRecommendationResponse` / 400 |
+|---|---|---|
+
+```json
+// TruckRecommendationRequest
+{ "depotId": 1, "shipmentIds": [3,4,5], "returnToDepot": true }   // returnToDepot optional, default true
+
+// TruckRecommendationResponse (feasible)
+{ "truckIds": [2], "trucks": [ {"id": 2, "plate": "WX 3003C"} ],
+  "totals": { ...same shape as a Plan's totals... },
+  "utilisationPct": 100.0,     // average pallet utilisation across the recommended trucks
+  "unassigned": [] }
+
+// TruckRecommendationResponse (infeasible - not even the whole fleet fits everything)
+{ "truckIds": [], "trucks": [], "totals": null, "utilisationPct": null,
+  "unassigned": [ { "shipmentId": 14, "reference": "PO-1099", "reason": "EXCEEDS_LARGEST_TRUCK",
+                    "message": "36 pallets exceed the largest payload of the selected trucks (24000 kg)." } ] }
+```
+
+Considers the **whole truck fleet**, not a caller-provided subset (that is what distinguishes it from `POST /api/plans`, which takes `truckIds`). Validation mirrors `PlanService` minus the truck selection (`TruckRecommendationService`, duplicated rather than shared - the two services check different things on a response-shaped-differently selection): `depotId` required and must exist, `shipmentIds` required, 1..200 ids, no nulls, no duplicates, all exist, every shipment's origin == `depotId`. All reported together in one 400, same field-error shapes as `/api/plans`.
+
+Search (`haulwise.solver.max-recommendation-trucks`, default 7, validated 0..12 at startup like `max-brute-force-stops` - 12, the limit, measured ~21s per request with max-brute-force-stops-sized routes, so the default is kept well below it): every non-empty subset of the fleet is tried when the fleet has at most this many trucks (up to 127 subsets at the default), smallest subset size first; a subset is feasible when `BinPacker` leaves nothing unassigned. Cost per feasible subset = sum over its trucks of `StopSequencer` (OPTIMAL / `RouteObjective.COST`) route cost. The cheapest feasible subset wins, even when it uses more trucks than another feasible subset (costs compared at `StopSequencer.SCORE_RESOLUTION`, the same 1e-6 tie resolution as route scores); only equal costs are broken by fewer trucks, then the lowest truck ids. Above the cap, exhaustive search is skipped (documented limitation, not a bug): the fleet is packed whole (biggest-first, as `BinPacker` already does), then any truck whose shipments the *remaining used trucks* can absorb without creating unassigned ones is greedily dropped - this does not reconsider trucks that got no shipments in the first pass, so the result is not guaranteed optimal above the cap. If no subset - not even the whole fleet - can carry every shipment, the response is `200` with `unassigned` naming what does not fit and why (same reasons as a Plan's `unassigned`), not a 500.
+
 **Features and AI** (T-24, T-25 - Should)
 | GET | `/api/features` | `200 {"ai": true|false, "osrm": true|false}` |
 |---|---|---|
@@ -433,6 +460,7 @@ Worked check for tests: 100 km, base 28, extra 10, load 12000/24000 -> 100/100 *
 | maxDailyDrivingMinutes | 540 (9 h) | Settings |
 | consolidationFillThresholdPct | 60 | Settings |
 | maxBruteForceStops | 8 (allowed 0..9) | `application.yml` (`haulwise.solver.max-brute-force-stops`) |
+| maxRecommendationTrucks (T-30) | 7 (allowed 0..12; 12 measured ~21s/request, see 5.3 "Recommendations") | `application.yml` (`haulwise.solver.max-recommendation-trucks`) |
 | per-truck consumption, payload, driver cost | per truck | Truck entity |
 
 EU Regulation (EC) 561/2006 values used (implementer re-verifies in T-22 and cites Art. 6 and 7 in README): after **4.5 h** of driving a break of at least **45 min** (may be split 15 + 30 min); daily driving max **9 h**, extendable to **10 h at most twice a week**; daily rest 11 h (out of scope); weekly 56 h / fortnightly 90 h (out of scope - single run). The 10 h extension is mentioned in the README only, not modelled.
@@ -607,3 +635,5 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 | T-27 | Client-side KPIs from `Plan` (fill rate, cost per pallet, empty km = return leg km) |
 | T-28 | `POST /api/plans/{id}/replan` reusing `Planner`; diff per truck |
 | T-29 | Run section 10 from a clean clone with network off and no `.env` |
+| T-30 | `TruckRecommendationController`/`Service` (own classes, `com.haulwise.controller`/`service`), `POST /api/trucks/recommend` (section 5.3, "Recommendations"). Search considers the whole fleet, not a caller-provided `truckIds`; validation mirrors `PlanService.validate` minus truck selection, duplicated rather than extracted (different selection shape, no shared superclass worth the coupling). `haulwise.solver.max-recommendation-trucks` (default 10, 0..12) caps exhaustive subset search; above it, a greedy drop fallback (documented limitation). Frontend: "Recommend trucks" button on `PlanForm`, ticks `truckIds` and shows an inline note; errors shown like other form errors |
+| T-31 | `SettingsForm` (new, replaces the `SettingsPage` placeholder): a full `@mantine/form` form for all 10 `SettingsRequest` fields, client ranges mirroring the backend exactly (including the two cross-field rules, for fast feedback - the server stays authoritative). `SettingsPage` loads with `useAsync(getSettings)` (loading/error/retry via the common components, no list involved) and saves via the existing `PUT /api/settings` (unchanged backend) |

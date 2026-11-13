@@ -38,7 +38,7 @@ public final class StopSequencer {
     /** 9! = 362 880 orders (well under a second): the most a single request may brute-force. */
     public static final int MAX_BRUTE_FORCE_STOPS_LIMIT = 9;
     /** Objective values closer than this count as equal (1/10 000 of a grosz for a PLN cost). */
-    static final double SCORE_RESOLUTION = 1e-6;
+    public static final double SCORE_RESOLUTION = 1e-6;
 
     private static final Comparator<Stop> BY_WAREHOUSE_ID = Comparator.comparingLong(Stop::warehouseId);
 

@@ -3,7 +3,7 @@ import { Route, Routes } from "react-router";
 import { ApiError } from "../api/client.js";
 import { createPlan } from "../api/plans.js";
 import { listShipments } from "../api/shipments.js";
-import { listTrucks } from "../api/trucks.js";
+import { listTrucks, recommendTrucks } from "../api/trucks.js";
 import { listWarehouses } from "../api/warehouses.js";
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { PlanPage } from "./PlanPage.jsx";
@@ -193,5 +193,93 @@ describe("PlanPage", () => {
       returnToDepot: false,
       departureTime: "2026-11-14T07:30:00",
     });
+  });
+
+  it("recommends trucks for the selected depot and shipments", async () => {
+    recommendTrucks.mockResolvedValue({
+      truckIds: [1],
+      trucks: [{ id: 1, plate: "WX 1001A" }],
+      totals: { costPln: 412 },
+      utilisationPct: 100,
+      unassigned: [],
+    });
+    const { user } = renderPage();
+    await chooseDepot(user);
+
+    await user.click(screen.getByRole("button", { name: "Recommend trucks" }));
+
+    expect(recommendTrucks).toHaveBeenCalledWith({
+      depotId: 1,
+      shipmentIds: [1, 2, 4],
+      returnToDepot: true,
+    });
+    expect(
+      await screen.findByText(
+        "Recommended: WX 1001A — 100% pallets, 412.00 PLN estimated",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /WX 1001A/ })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: /WX 2002B/ }),
+    ).not.toBeChecked();
+  });
+
+  it("is disabled until a depot and a shipment are selected", async () => {
+    const { user } = renderPage();
+
+    expect(
+      await screen.findByRole("button", { name: "Recommend trucks" }),
+    ).toBeDisabled();
+
+    await chooseDepot(user);
+
+    expect(
+      screen.getByRole("button", { name: "Recommend trucks" }),
+    ).toBeEnabled();
+  });
+
+  it("shows which shipments do not fit anywhere instead of failing", async () => {
+    recommendTrucks.mockResolvedValue({
+      truckIds: [],
+      trucks: [],
+      totals: null,
+      utilisationPct: null,
+      unassigned: [
+        {
+          shipmentId: 99,
+          reference: "PO-99",
+          reason: "EXCEEDS_LARGEST_TRUCK",
+          message: "40 pallets exceed the largest selected truck (33 pallets).",
+        },
+      ],
+    });
+    const { user } = renderPage();
+    await chooseDepot(user);
+
+    await user.click(screen.getByRole("button", { name: "Recommend trucks" }));
+
+    expect(
+      await screen.findByText(
+        "PO-99: 40 pallets exceed the largest selected truck (33 pallets).",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a readable message when the recommendation call fails", async () => {
+    recommendTrucks.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: "NETWORK",
+        detail: "Cannot reach the server.",
+      }),
+    );
+    const { user } = renderPage();
+    await chooseDepot(user);
+
+    await user.click(screen.getByRole("button", { name: "Recommend trucks" }));
+
+    expect(
+      await screen.findByText("Cannot reach the server."),
+    ).toBeInTheDocument();
   });
 });

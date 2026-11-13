@@ -163,8 +163,8 @@ Each task is about 1-3 hours.
 - [ ] **T-29** Final QA: clean-clone run, no-API-key run, offline run, seed sanity, lint/format. (Must)
 
 ### Post-MVP extras (added 2026-11-13, time allowed after T-29)
-- [ ] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet, pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
-- [ ] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
+- [x] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet, pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
+- [x] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
 
 **Day 3 milestone:** polished plan UI, tests green, README complete, clean-clone run works.
 

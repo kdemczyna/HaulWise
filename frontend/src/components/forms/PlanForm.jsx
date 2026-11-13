@@ -15,12 +15,15 @@ import {
 import { useForm } from "@mantine/form";
 import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { errorMessage } from "../../api/client.js";
 import { createPlan } from "../../api/plans.js";
 import { listShipments } from "../../api/shipments.js";
+import { recommendTrucks } from "../../api/trucks.js";
 import { useAsync } from "../../hooks/useAsync.js";
 import {
   formatDeadline,
   formatKg,
+  formatPln,
   fromDateTimeInput,
   toDateTimeInput,
 } from "../../utils/format.js";
@@ -111,6 +114,52 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
     [depotId],
   );
   const shipments = useAsync(loadShipments);
+  const [recommendation, setRecommendation] = useState({
+    loading: false,
+    note: null,
+    error: null,
+  });
+
+  const selectedShipmentIds = selectedIds(
+    form.values.shipmentIds,
+    shipments.data,
+  );
+  const canRecommend = Boolean(depotId) && selectedShipmentIds.length > 0;
+
+  const handleRecommend = async () => {
+    setRecommendation({ loading: true, note: null, error: null });
+    try {
+      const result = await recommendTrucks({
+        depotId: Number(depotId),
+        shipmentIds: selectedShipmentIds.map(Number),
+        returnToDepot: form.values.returnToDepot,
+      });
+      if (result.unassigned.length > 0) {
+        setRecommendation({
+          loading: false,
+          note: null,
+          error: unassignedMessage(result.unassigned),
+        });
+        return;
+      }
+      form.setFieldValue(
+        "truckIds",
+        result.truckIds.map((id) => String(id)),
+      );
+      form.clearFieldError("truckIds");
+      setRecommendation({
+        loading: false,
+        note: recommendationNote(result),
+        error: null,
+      });
+    } catch (error) {
+      setRecommendation({
+        loading: false,
+        note: null,
+        error: errorMessage(error),
+      });
+    }
+  };
 
   const handleSubmit = form.onSubmit(async (values) => {
     setFormError(null);
@@ -195,6 +244,27 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
             )
           }
         />
+
+        <Group justify="space-between" align="flex-start" wrap="wrap">
+          <Button
+            variant="default"
+            size="sm"
+            loading={recommendation.loading}
+            disabled={!canRecommend}
+            onClick={handleRecommend}
+          >
+            Recommend trucks
+          </Button>
+          <Text
+            span
+            size="sm"
+            c={recommendation.error ? "red" : "dimmed"}
+            role="status"
+            aria-live="polite"
+          >
+            {recommendation.error || recommendation.note}
+          </Text>
+        </Group>
 
         <SelectionSection
           title="Trucks"
@@ -335,4 +405,17 @@ function truckLabel(truck) {
       </Text>
     </Group>
   );
+}
+
+/** "Recommended: WX 3003C — 100% pallets, 412.00 PLN estimated" for the recommendation result. */
+function recommendationNote(result) {
+  const plates = result.trucks.map((truck) => truck.plate).join(", ");
+  return `Recommended: ${plates} — ${result.utilisationPct}% pallets, ${formatPln(result.totals.costPln)} estimated`;
+}
+
+/** "PO-1: 40 pallets exceed the largest selected truck (33 pallets)." for one or more unassigned shipments. */
+function unassignedMessage(unassigned) {
+  return unassigned
+    .map((item) => `${item.reference}: ${item.message}`)
+    .join(" ");
 }

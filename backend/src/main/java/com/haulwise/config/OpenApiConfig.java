@@ -45,7 +45,7 @@ public class OpenApiConfig {
 
     /** Order of the tags declared on the controllers; tags not listed here follow in their own order. */
     static final List<String> TAG_ORDER = List.of(
-            "Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans");
+            "Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans", "Recommendations");
 
     @Bean
     OpenAPI haulWiseOpenApi() {
