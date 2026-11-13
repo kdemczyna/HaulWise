@@ -124,7 +124,7 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
       const plan = await createPlan(request);
       navigate(`/plans/${plan.id}`);
     } catch (error) {
-      setFormError(applyServerErrors(form, error, "plan"));
+      setFormError(applyServerErrors(form, error, "plan", "created"));
     }
   });
 

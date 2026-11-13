@@ -147,9 +147,9 @@ Each task is about 1-3 hours.
 
 ### Day 3 - Plan UI polish, should-haves, tests, README, QA
 - [x] **T-17** Plan result UI polish: side-by-side optimal vs priority, delta sentence, per-truck timeline, utilisation bars, warnings. (Must)
-- [ ] **T-18** Backend API tests (MockMvc: CRUD, validation, 409, CORS, plan endpoint). (Must)
-- [ ] **T-19** Frontend tests (Vitest/RTL, small set: forms, delta display, warnings). (Must)
-- [ ] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
+- [x] **T-18** Backend API tests (MockMvc: CRUD, validation, 409, CORS, plan endpoint). (Must)
+- [x] **T-19** Frontend tests (Vitest/RTL, small set: forms, delta display, warnings). (Must)
+- [x] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
 - [ ] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
 - [ ] **T-22** EU driving-time compliance check (verify rules, configurable) + UI warning. (Should)
 - [ ] **T-23** Load consolidation suggestion with saving. (Should)
@@ -174,8 +174,8 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | 4 | `feature/route-planner` | T-09, T-10, T-11, T-12, T-13 |
 | 5 | `feature/frontend-crud` | T-14, T-15 |
 | 6 | `feature/plan-ui` | T-16, T-17 |
-| 7 | `test/api-and-ui-tests` | T-18, T-19 |
-| 8 | `feature/ux-polish` | T-20 |
+| 7 | `test/api-and-ui-tests` | T-18, T-19 (done on `feature/plan-ui`, lean shortcut) |
+| 8 | `feature/ux-polish` | T-20 (done on `feature/plan-ui`, lean shortcut) |
 | 9 | `feature/compliance-consolidation` | T-22, T-23 |
 | 10 | `feature/ai-assist` | T-24, T-25 |
 | 11 | `feature/osrm-refresh` | T-26 |

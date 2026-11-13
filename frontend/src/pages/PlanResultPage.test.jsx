@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import { Route, Routes } from "react-router";
 import { ApiError } from "../api/client.js";
-import { getPlan } from "../api/plans.js";
+import { createPlan, getPlan } from "../api/plans.js";
 import { DEMO_PLAN } from "../test/fixtures/plan.js";
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { PlanResultPage } from "./PlanResultPage.jsx";
@@ -167,6 +167,42 @@ describe("PlanResultPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText("Not used: WX 1001A, WX 2002B, WX 3003C"),
+    ).toBeInTheDocument();
+  });
+
+  it("plans the same run again and opens the new plan", async () => {
+    createPlan.mockResolvedValue({ id: "plan-2" });
+    const { user } = renderPage();
+    await user.click(await screen.findByRole("button", { name: "Plan again" }));
+
+    expect(createPlan).toHaveBeenCalledWith(DEMO_PLAN.request);
+    expect(getPlan).toHaveBeenLastCalledWith("plan-2");
+  });
+
+  it("shows a load error and retries", async () => {
+    getPlan
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 0,
+          code: "NETWORK",
+          detail: "Cannot reach the server.",
+        }),
+      )
+      .mockResolvedValue(DEMO_PLAN);
+    const { user } = renderWithProviders(
+      <Routes>
+        <Route path="/plans/:id" element={<PlanResultPage />} />
+      </Routes>,
+      { route: `/plans/${DEMO_PLAN.id}` },
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Cannot reach the server.",
+    );
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(
+      await screen.findByRole("region", { name: "Cost of priority" }),
     ).toBeInTheDocument();
   });
 

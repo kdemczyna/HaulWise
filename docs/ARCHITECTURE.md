@@ -472,7 +472,7 @@ OSRM (optional, T-26): `POST /api/distances/refresh` calls `GET {osrmBaseUrl}/ta
 
 ## 8. Frontend design (T-14..T-17, T-19, T-20)
 
-- **Layout**: Mantine `AppShell` with navbar: *Plan a run* (`/`), *Shipments*, *Trucks*, *Warehouses*, *Settings*; result at `/plans/:id`. Responsive: navbar collapses to burger below `sm`; plan comparison becomes stacked tabs on mobile.
+- **Layout**: Mantine `AppShell` with navbar: *Plan a run* (`/`), *Shipments*, *Trucks*, *Warehouses*, *Settings*; result at `/plans/:id`. Responsive: navbar collapses to burger below `sm`; plan comparison table scrolls inside its box on mobile.
 - **API client** (`api/client.js`): `request(method, path, body)` on `fetch`, base URL from `import.meta.env.VITE_API_BASE_URL`; on non-2xx parses problem+json into `ApiError {status, code, title, detail, fieldErrors: {field: message}}`; network failure -> `ApiError {code: 'NETWORK'}` with message "Cannot reach the HaulWise server. Is the backend running on :8080?". Resource modules export plain functions (`listShipments(filters)`, `createPlan(req)`, ...).
 - **State**: no global store. Page-level state + a small `useAsync(fn)` hook (`{data, error, loading, reload}`; `fn` is wrapped in `useCallback` by the caller with the values it reads, e.g. filters, as dependencies - T-14 changed this from `useAsync(fn, deps)` so oxlint's `exhaustive-deps` checks the dependencies). Features fetched once in `useFeatures` (context). Plan result is re-fetchable by URL via `GET /api/plans/{id}`; if 404 (restart), show "This plan expired - plan again" with a link.
 - **CRUD pages**: Mantine `Table` + `Modal` forms (create/edit share one form component), `ConfirmDeleteModal`, notifications on success, 409 shown with the server `detail` inside the open dialog (form-level `Alert` in the form modal, `Alert` in `ConfirmDeleteModal` for "warehouse in use"; T-15 - the dialog stays open so the user can fix or cancel). Shipments: `SegmentedControl`/chips filter by priority, `PriorityBadge` colours (URGENT red, HIGH orange, NORMAL gray). Deadline input: `TextInput type="datetime-local"` (avoids `@mantine/dates` + dayjs, D-11).
@@ -496,7 +496,7 @@ Mockups: https://claude.ai/artifact/RvufXouJutNaGMx36TmZH6 (the tokens below are
 | Font | Inter (Google Fonts link in `index.html`, `system-ui` fallback when offline), headings 700 |
 | Radius / buttons | md 8 px, cards and papers 10 px; default-size buttons 40 px tall |
 | Priority tags (pill) | URGENT bg `#FEE4E2` text `#B42318`; HIGH bg `#FEF0C7` text `#93370D`; NORMAL bg `#F2F4F7` text `#475467`. Pinned: outline pill "Pinned first" |
-| Route colours by `colorIndex` (`routeColor`, cycles) | 0 `#1D5FD1`, 1 `#7A5AF8`, 2 `#0E9384`, 3 `#C11574`, 4 `#CA8504`, 5 `#475467` |
+| Route colours by `colorIndex` (`routeColor`, cycles) | 0 `#1D5FD1`, 1 `#7A5AF8`, 2 `#107569`, 3 `#C11574`, 4 `#A15C07`, 5 `#475467` (T-20: teal and amber darkened from `#0E9384` / `#CA8504` so the white marker numbers reach 4.5:1) |
 
 Shell: white header bar 60 px with a bottom border; brand = 28 px blue rounded square with a white "H" + "HaulWise"; nav items, active = `#EAF1FD` background, `#163F8C` text, weight 600; page content on the grey page background.
 

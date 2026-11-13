@@ -62,7 +62,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Positioned, so visually hidden (absolute) cell text is clipped by the box too and never widens the page. */
 .hw-table-box {
+  position: relative;
   overflow: hidden;
 }
 

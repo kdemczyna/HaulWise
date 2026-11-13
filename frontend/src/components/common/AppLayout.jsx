@@ -26,14 +26,33 @@ function isItemActive(item, pathname) {
     : pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-/** Moves focus to the new page's h1 after client-side navigation (not on the first load). */
+/**
+ * Moves focus to the new page's h1 after client-side navigation (not on the first load).
+ * A lazy page shows its Suspense fallback first, so the h1 is awaited until it appears.
+ */
 function useFocusHeadingOnNavigation(pathname, mainRef) {
   const previousPathname = useRef(pathname);
   useEffect(() => {
-    if (previousPathname.current !== pathname) {
-      previousPathname.current = pathname;
-      mainRef.current?.querySelector("h1")?.focus();
+    const main = mainRef.current;
+    if (previousPathname.current === pathname || !main) {
+      return undefined;
     }
+    previousPathname.current = pathname;
+    const focusHeading = () => {
+      const heading = main.querySelector("h1");
+      heading?.focus();
+      return Boolean(heading);
+    };
+    if (focusHeading()) {
+      return undefined;
+    }
+    const observer = new MutationObserver(() => {
+      if (focusHeading()) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [pathname, mainRef]);
 }
 

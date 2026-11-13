@@ -129,8 +129,36 @@ describe("PlanPage", () => {
       await screen.findByText("shipment 4 does not exist"),
     ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Fix the highlighted fields",
+      "The plan could not be created. Fix the highlighted fields.",
     );
+  });
+
+  it("shows a readable message when the server cannot be reached", async () => {
+    createPlan.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: "NETWORK",
+        detail: "Cannot reach the server.",
+      }),
+    );
+    const { user } = renderPage();
+    await chooseDepot(user);
+    await user.click(screen.getByRole("button", { name: "Plan the run" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Cannot reach the server.",
+    );
+    expect(screen.getByRole("button", { name: "Plan the run" })).toBeEnabled();
+  });
+
+  it("asks for warehouses first when there are none", async () => {
+    listWarehouses.mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByText("No warehouses yet")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Go to Warehouses" }),
+    ).toHaveAttribute("href", "/warehouses");
   });
 
   it("prefills the form from a previous run (Edit run)", async () => {
