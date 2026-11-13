@@ -116,6 +116,8 @@
 - **US-11 AI order entry (Should).** AC: with a key, pasted free text fills the shipment form for review (never auto-saves); a short plan summary is available; without a key the controls are hidden and nothing errors; numbers in the summary come only from code.
 - **US-12 KPI dashboard (Extra).** AC: fill rate, cost per pallet and empty km per truck and per plan.
 - **US-13 Urgent re-plan (Extra).** AC: adding an urgent shipment to an existing plan shows which trucks and stops change and the cost delta.
+- **US-14 Truck recommendation (Extra, added post-MVP 2026-11-13).** AC: given a depot and selected shipments, the app suggests which trucks to use from the whole fleet (not just the ones already ticked), picking the cheapest combination that fits everything; the dispatcher sees why (cost, utilisation) and can still change the selection by hand before planning.
+- **US-15 Editable settings (Extra, added post-MVP 2026-11-13).** AC: diesel price, average speed, road factor, priority weights and the EU driving-time limits are editable from the Settings page (not only via the API), with the same validation ranges as the backend and a success notification on save.
 
 ## 6. Task breakdown and milestones
 
@@ -160,6 +162,10 @@ Each task is about 1-3 hours.
 - [ ] **T-28** Urgent re-plan with change list and cost delta. (Extra)
 - [ ] **T-29** Final QA: clean-clone run, no-API-key run, offline run, seed sanity, lint/format. (Must)
 
+### Post-MVP extras (added 2026-11-13, time allowed after T-29)
+- [ ] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet, pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
+- [ ] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
+
 **Day 3 milestone:** polished plan UI, tests green, README complete, clean-clone run works.
 
 ### Git branches (approved 2026-11-12)
@@ -181,6 +187,7 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | 11 | `feature/osrm-refresh` | T-26 |
 | - | `feature/kpi-and-replan` | T-27, T-28 (only if time) |
 | 12 | `docs/readme-final-qa` | T-21, T-29 (always last, so the README describes what was built) |
+| 13 | `feature/extras` | T-30, T-31 (post-MVP, after T-29; merged last, README not re-run) |
 
 ### CUT LINE
 
