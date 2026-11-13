@@ -62,8 +62,23 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Positioned, so visually hidden (absolute) cell text is clipped by the box too and never widens the page. */
 .hw-table-box {
+  position: relative;
   overflow: hidden;
+}
+
+/* Only on narrow screens, where wide tables scroll inside their box. */
+.hw-scroll-hint {
+  display: none;
+  padding: 6px 12px;
+  border-top: 1px solid var(--hw-color-border);
+}
+
+@media (max-width: 47.99em) {
+  .hw-scroll-hint {
+    display: block;
+  }
 }
 
 .hw-table thead {
@@ -101,4 +116,107 @@ body {
 .hw-list[data-reloading] {
   opacity: 0.6;
   transition: opacity 150ms;
+}
+
+.hw-delta-banner[data-tone="priority"] {
+  border-left: 4px solid var(--mantine-color-priority-6);
+}
+
+.hw-delta-banner[data-tone="success"] {
+  border-left: 4px solid var(--hw-color-success);
+}
+
+.hw-delta-amount {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hw-delta-banner[data-tone="priority"] .hw-delta-amount {
+  color: var(--mantine-color-priority-6);
+}
+
+.hw-delta-banner[data-tone="success"] .hw-delta-amount {
+  color: var(--hw-color-success);
+}
+
+.hw-route-card {
+  border-left: 4px solid var(--hw-route-color);
+}
+
+.hw-stops,
+.hw-plain-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hw-stops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+
+.hw-stop {
+  display: flex;
+  gap: var(--mantine-spacing-sm);
+  align-items: flex-start;
+}
+
+.hw-stop-number {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--hw-route-color);
+  color: var(--hw-color-surface);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 700;
+}
+
+.hw-status-late {
+  color: var(--hw-color-danger);
+}
+
+.hw-status-on-time {
+  color: var(--hw-color-success);
+}
+
+.hw-route-details summary {
+  cursor: pointer;
+  color: var(--hw-color-brand);
+  font-size: var(--mantine-font-size-sm);
+  margin-bottom: var(--mantine-spacing-sm);
+}
+
+.hw-badge-fixed {
+  flex: none;
+}
+
+.hw-map {
+  height: 380px;
+  border: 1px solid var(--hw-color-border);
+  border-radius: 10px;
+  background-color: var(--hw-color-page);
+}
+
+.hw-map-marker span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--hw-color-surface);
+  border-radius: 50%;
+  color: var(--hw-color-surface);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+}
+
+.hw-map-depot span {
+  border-radius: 6px;
+  background-color: var(--hw-color-text);
 }

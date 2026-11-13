@@ -1,7 +1,15 @@
 const DEFAULT_BASE_URL = "http://localhost:8080/api";
 
-export const NETWORK_ERROR_MESSAGE =
-  "Cannot reach the HaulWise server. Is the backend running on :8080?";
+/** Network-failure message naming the configured server, e.g. "localhost:8080". */
+export const NETWORK_ERROR_MESSAGE = `Cannot reach the HaulWise server. Is the backend running at ${serverHost()}?`;
+
+function serverHost() {
+  try {
+    return new URL(import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE_URL).host;
+  } catch {
+    return "the configured address";
+  }
+}
 
 const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
 

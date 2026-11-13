@@ -121,7 +121,7 @@ class PlanSeedDemoApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].code").value("DEADLINE_MISSED"))
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].shipmentIds").value(contains((int) po1042)))
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].message").value("WX 1001A arrives in Gdansk "
-                        + "at 2026-11-13 23:18, after the deadline of PO-1042 (2026-11-13 12:00)."))
+                        + "at 13 Nov, 23:18, after the deadline of PO-1042 (13 Nov, 12:00)."))
                 .andExpect(jsonPath("$.priority.routes[0].warnings", hasSize(0)))
                 .andExpect(jsonPath("$.unassigned", hasSize(1)))
                 .andExpect(jsonPath("$.unassigned[0].shipmentId").value(po1099))

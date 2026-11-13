@@ -5,7 +5,7 @@ describe("routeColor", () => {
     expect([0, 1, 2].map(routeColor)).toEqual([
       "#1D5FD1",
       "#7A5AF8",
-      "#0E9384",
+      "#107569",
     ]);
   });
 

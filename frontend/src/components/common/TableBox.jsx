@@ -1,4 +1,4 @@
-import { Paper, Table } from "@mantine/core";
+import { Paper, Table, Text } from "@mantine/core";
 
 /**
  * Bordered table that scrolls horizontally inside its box below `minWidth`, so narrow
@@ -18,6 +18,9 @@ export function TableBox({ label, minWidth, children }) {
           {children}
         </Table>
       </Table.ScrollContainer>
+      <Text size="xs" c="dimmed" className="hw-scroll-hint" aria-hidden="true">
+        Scroll sideways to see all columns
+      </Text>
     </Paper>
   );
 }

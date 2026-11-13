@@ -7,7 +7,7 @@ import { errorMessage } from "../api/client.js";
  * Messages of field errors for fields the form does not show are added to the alert text
  * (without the API field name, which means nothing to the user).
  */
-export function applyServerErrors(form, error, itemType) {
+export function applyServerErrors(form, error, itemType, outcome = "saved") {
   const fieldErrors = error?.fieldErrors ?? {};
   const values = form.getValues();
   const onForm = {};
@@ -24,6 +24,6 @@ export function applyServerErrors(form, error, itemType) {
   if (Object.keys(onForm).length === 0) {
     return elsewhere.length > 0 ? elsewhere.join("; ") : errorMessage(error);
   }
-  const hint = `The ${itemType} could not be saved. Fix the highlighted fields.`;
+  const hint = `The ${itemType} could not be ${outcome}. Fix the highlighted fields.`;
   return elsewhere.length > 0 ? `${hint} ${elsewhere.join("; ")}` : hint;
 }

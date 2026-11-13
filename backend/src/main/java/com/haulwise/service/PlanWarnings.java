@@ -14,7 +14,7 @@ final class PlanWarnings {
 
     static final int MAX_LISTED_LEGS = 5;
 
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale.ENGLISH);
 
     private PlanWarnings() {
     }
@@ -34,7 +34,7 @@ final class PlanWarnings {
     }
 
     /**
-     * "WX 1001A arrives in Gdansk at 2026-11-13 23:18, after the deadline of PO-1042 (2026-11-13 12:00)."
+     * "WX 1001A arrives in Gdansk at 13 Nov, 23:18, after the deadline of PO-1042 (13 Nov, 12:00)."
      */
     static WarningResponse deadlineMissed(long truckId, String plate, String city, LocalDateTime arrival,
                                           List<LateShipment> late) {
