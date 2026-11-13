@@ -118,6 +118,8 @@
 - **US-13 Urgent re-plan (Extra).** AC: adding an urgent shipment to an existing plan shows which trucks and stops change and the cost delta.
 - **US-14 Truck recommendation (Extra, added post-MVP 2026-11-13).** AC: given a depot and selected shipments, the app suggests which trucks to use from the whole fleet (not just the ones already ticked), picking the cheapest combination that fits everything; the dispatcher sees why (cost, utilisation) and can still change the selection by hand before planning.
 - **US-15 Editable settings (Extra, added post-MVP 2026-11-13).** AC: diesel price, average speed, road factor, priority weights and the EU driving-time limits are editable from the Settings page (not only via the API), with the same validation ranges as the backend and a success notification on save.
+- **US-16 Truck home depot (Extra, added post-MVP 2026-11-14).** AC: every truck has a home warehouse; a plan can only use trucks based at the chosen depot, enforced by the API (not just hidden in the UI); the Trucks page shows and can set a truck's home depot; adding trucks at other depots doesn't slow down planning or recommending trucks at depots with a small fleet.
+- **US-17 Dispatch a plan / "Send trucks" (Extra, added post-MVP 2026-11-14).** AC: from a plan result, "Send trucks" marks every truck actually used in the shown variant as on-route (unavailable for new plans) and removes every shipment that was routed in it (shipments left unassigned by the plan are untouched); nothing in-app represents messaging drivers — this only records the dispatch; a truck can be marked available again by hand on the Trucks page; sending the same plan twice is refused with a clear message, not a crash or a double delete.
 
 ## 6. Task breakdown and milestones
 
@@ -165,6 +167,8 @@ Each task is about 1-3 hours.
 ### Post-MVP extras (added 2026-11-13, time allowed after T-29)
 - [x] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet, pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
 - [x] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
+- [ ] **T-32** Truck home depot: `homeWarehouseId` on Truck; keep the existing 5 WAW Central trucks unchanged (preserves the demo numbers byte-for-byte), add new trucks at POZ West (and optionally elsewhere) sized for its own shipments; `POST /api/plans` and `/api/trucks/recommend` only consider trucks homed at the chosen depot (400/no-candidate, never a cross-depot result); Trucks CRUD shows/sets the home depot; Plan form's truck checklist filters by the selected depot. A test must prove a bigger fleet at one depot doesn't slow down planning at another. (Extra, US-16)
+- [ ] **T-33** Dispatch a plan ("Send trucks"): `available` flag on Truck (toggle by hand on the Trucks page, reusing truck CRUD); `POST /api/plans/{id}/dispatch` (chosen variant) marks its routed trucks unavailable and deletes its routed shipments, idempotent (a second dispatch of the same plan is refused with a clear message, not a crash); plans and recommendations also exclude unavailable trucks (depends on T-32). (Extra, US-17)
 
 **Day 3 milestone:** polished plan UI, tests green, README complete, clean-clone run works.
 
@@ -188,6 +192,7 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | - | `feature/kpi-and-replan` | T-27, T-28 (only if time) |
 | 12 | `docs/readme-final-qa` | T-21, T-29 (always last, so the README describes what was built) |
 | 13 | `feature/extras` | T-30, T-31 (post-MVP, after T-29; merged last, README not re-run) |
+| 14 | `feature/fleet-ops` | T-32, T-33 (post-MVP, after T-30/T-31; home depot and dispatch share the same "available truck pool per depot" concept) |
 
 ### CUT LINE
 
