@@ -44,8 +44,8 @@ class PlanWarningsTest {
         assertThat(warning.code()).isEqualTo(PlanWarningCode.DEADLINE_MISSED);
         assertThat(warning.severity()).isEqualTo(WarningSeverity.WARNING);
         assertThat(warning.shipmentIds()).containsExactly(5L, 6L);
-        assertThat(warning.message()).isEqualTo("WX 2002B arrives in Lublin at 2026-11-13 15:00, after the "
-                + "deadlines of PO-5 (2026-11-13 12:00) and PO-6 (2026-11-13 13:00).");
+        assertThat(warning.message()).isEqualTo("WX 2002B arrives in Lublin at 13 Nov, 15:00, after the "
+                + "deadlines of PO-5 (13 Nov, 12:00) and PO-6 (13 Nov, 13:00).");
     }
 
     @Test

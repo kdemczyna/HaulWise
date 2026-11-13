@@ -68,6 +68,19 @@ body {
   overflow: hidden;
 }
 
+/* Only on narrow screens, where wide tables scroll inside their box. */
+.hw-scroll-hint {
+  display: none;
+  padding: 6px 12px;
+  border-top: 1px solid var(--hw-color-border);
+}
+
+@media (max-width: 47.99em) {
+  .hw-scroll-hint {
+    display: block;
+  }
+}
+
 .hw-table thead {
   background-color: var(--hw-color-page);
 }

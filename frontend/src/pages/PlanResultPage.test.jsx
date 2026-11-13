@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { Route, Routes } from "react-router";
 import { ApiError } from "../api/client.js";
 import { createPlan, getPlan } from "../api/plans.js";
@@ -176,7 +176,7 @@ describe("PlanResultPage", () => {
     await user.click(await screen.findByRole("button", { name: "Plan again" }));
 
     expect(createPlan).toHaveBeenCalledWith(DEMO_PLAN.request);
-    expect(getPlan).toHaveBeenLastCalledWith("plan-2");
+    await waitFor(() => expect(getPlan).toHaveBeenLastCalledWith("plan-2"));
   });
 
   it("shows a load error and retries", async () => {

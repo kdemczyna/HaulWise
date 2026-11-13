@@ -244,7 +244,7 @@ class PlanApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].truckId").value(truck.getId()))
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].shipmentIds", contains(late.getId().intValue())))
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].message").value(
-                        "WX 1001A arrives in Bstadt at 2026-11-13 07:30, after the deadline of PO-1 (2026-11-13 07:00)."))
+                        "WX 1001A arrives in Bstadt at 13 Nov, 07:30, after the deadline of PO-1 (13 Nov, 07:00)."))
                 .andExpect(jsonPath("$.warnings", hasSize(0)));
     }
 
