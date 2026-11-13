@@ -100,7 +100,7 @@ class PlanApiTest {
         settings.deleteAll();
         depot = warehouses.save(new Warehouse("Depot A", "Astadt", 52.0, 21.0));
         bstadt = warehouses.save(new Warehouse("B Hub", "Bstadt", 51.0, 20.0));
-        truck = trucks.save(new Truck("WX 1001A", 33, 24000, 28, 10, 45));
+        truck = trucks.save(new Truck("WX 1001A", 33, 24000, 28, 10, 45, depot));
     }
 
     /**
@@ -117,6 +117,7 @@ class PlanApiTest {
                 DEPARTURE))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdAt").value("2026-11-12T09:30:00"))
+                .andExpect(jsonPath("$.dispatchedAt").value(nullValue()))
                 .andExpect(jsonPath("$.request.returnToDepot").value(true))
                 .andExpect(jsonPath("$.request.departureTime").value("2026-11-13T06:00:00"))
                 .andExpect(jsonPath("$.depot.name").value("Depot A"))
@@ -330,7 +331,7 @@ class PlanApiTest {
 
     @Test
     void nothingLoadedSaysThereIsNothingToCompare() throws Exception {
-        Truck small = trucks.save(new Truck("WX 4004D", 10, 6000, 18, 5, 40));
+        Truck small = trucks.save(new Truck("WX 4004D", 10, 6000, 18, 5, 40, depot));
         Shipment heavy = shipment("PO-1", bstadt, 8, 30000, Priority.NORMAL, false, null);
 
         createPlan(request(depot.getId(), List.of(heavy.getId()), List.of(small.getId()), true, DEPARTURE))
@@ -404,6 +405,39 @@ class PlanApiTest {
                 .andExpect(jsonPath("$.errors[0].field").value("shipmentIds"))
                 .andExpect(jsonPath("$.errors[0].message")
                         .value("PO-9 (id " + fromElsewhere.getId() + ") does not start at depot Depot A"));
+    }
+
+    /** T-32 + T-33: a truck of another depot and a truck on route are both named, with the shipment error, in one 400. */
+    @Test
+    void trucksBasedElsewhereOrOnRouteReturn400NamingEachTogetherWithOtherErrors() throws Exception {
+        Shipment fromDepot = shipment("PO-1", bstadt, 10, 5000, Priority.NORMAL, false, null);
+        Shipment fromElsewhere = shipments.save(new Shipment("PO-9", bstadt, depot, 4, 1000));
+        Truck foreign = trucks.save(new Truck("PO 6006F", 33, 24000, 28, 10, 45, bstadt));
+        Truck onRoute = new Truck("WX 2002B", 33, 24000, 29, 10, 45, depot);
+        onRoute.setAvailable(false);
+        onRoute = trucks.save(onRoute);
+
+        createPlan(request(depot.getId(), List.of(fromDepot.getId(), fromElsewhere.getId()),
+                List.of(truck.getId(), foreign.getId(), onRoute.getId()), true, DEPARTURE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", hasSize(3)))
+                .andExpect(jsonPath("$.errors[0].field").value("shipmentIds"))
+                .andExpect(jsonPath("$.errors[1].field").value("truckIds"))
+                .andExpect(jsonPath("$.errors[1].message").value("Truck PO 6006F is based at B Hub, not at Depot A."))
+                .andExpect(jsonPath("$.errors[2].field").value("truckIds"))
+                .andExpect(jsonPath("$.errors[2].message").value("Truck WX 2002B is already on route."));
+    }
+
+    @Test
+    void truckOfAnotherDepotIsRejectedEvenWhenItIsTheOnlySelection() throws Exception {
+        storeLegBothWays(depot, bstadt, 100, 90);
+        Shipment shipment = shipment("PO-1", bstadt, 10, 5000, Priority.NORMAL, false, null);
+        Truck foreign = trucks.save(new Truck("PO 6006F", 33, 24000, 28, 10, 45, bstadt));
+
+        createPlan(request(depot.getId(), List.of(shipment.getId()), List.of(foreign.getId()), true, DEPARTURE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", hasSize(1)))
+                .andExpect(jsonPath("$.errors[0].message").value("Truck PO 6006F is based at B Hub, not at Depot A."));
     }
 
     @Test

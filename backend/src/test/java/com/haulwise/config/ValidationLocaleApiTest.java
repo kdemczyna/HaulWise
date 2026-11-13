@@ -30,7 +30,7 @@ class ValidationLocaleApiTest {
     private static final Locale POLISH = Locale.forLanguageTag("pl-PL");
     private static final String INVALID_TRUCK = """
             {"plate":"WX 1001A","capacityPallets":0,"payloadKg":24000,"baseConsumptionLPer100Km":28,
-             "extraConsumptionFullLoadLPer100Km":10,"driverCostPlnPerHour":45}
+             "extraConsumptionFullLoadLPer100Km":10,"driverCostPlnPerHour":45,"homeWarehouseId":1}
             """;
 
     @Autowired
@@ -57,7 +57,7 @@ class ValidationLocaleApiTest {
             Locale.setDefault(POLISH);
             LocaleContextHolder.setLocale(POLISH);
             Set<ConstraintViolation<TruckRequest>> violations =
-                    validator.validate(new TruckRequest("WX 1001A", 0, 24000, 28.0, 10.0, 45.0));
+                    validator.validate(new TruckRequest("WX 1001A", 0, 24000, 28.0, 10.0, 45.0, 1L, null));
 
             assertThat(violations).extracting(ConstraintViolation::getMessage)
                     .containsExactly("must be greater than or equal to 1");

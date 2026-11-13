@@ -4,12 +4,18 @@ import {
   createTruck,
   deleteTruck,
   listTrucks,
+  setTruckAvailable,
   updateTruck,
 } from "../api/trucks.js";
+import { listWarehouses } from "../api/warehouses.js";
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { TrucksPage } from "./TrucksPage.jsx";
 
 vi.mock("../api/trucks.js");
+vi.mock("../api/warehouses.js");
+
+const WAW = { id: 1, name: "WAW Central", city: "Warsaw" };
+const POZ = { id: 4, name: "POZ West", city: "Poznan" };
 
 const TRUCK = {
   id: 1,
@@ -19,6 +25,8 @@ const TRUCK = {
   baseConsumptionLPer100Km: 28,
   extraConsumptionFullLoadLPer100Km: 10,
   driverCostPlnPerHour: 45,
+  homeWarehouse: WAW,
+  available: true,
 };
 
 function dialog(name) {
@@ -38,12 +46,17 @@ async function fillNewTruck(user, form) {
     "7",
   );
   await user.type(form.getByRole("textbox", { name: /Driver cost/ }), "42");
+  await user.selectOptions(
+    form.getByRole("combobox", { name: /Home depot/ }),
+    "POZ West (Poznan)",
+  );
 }
 
 describe("TrucksPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     listTrucks.mockResolvedValue([TRUCK]);
+    listWarehouses.mockResolvedValue([POZ, WAW]);
   });
 
   it("lists trucks with capacity, payload and consumption", async () => {
@@ -56,6 +69,8 @@ describe("TrucksPage", () => {
     expect(row).toHaveTextContent(/24\s000\skg/);
     expect(row).toHaveTextContent("28 + 10 at full load");
     expect(row).toHaveTextContent("45 PLN/h");
+    expect(row).toHaveTextContent("WAW Central");
+    expect(row).toHaveTextContent("Available");
   });
 
   it("shows an empty state", async () => {
@@ -100,6 +115,7 @@ describe("TrucksPage", () => {
       baseConsumptionLPer100Km: 22.5,
       extraConsumptionFullLoadLPer100Km: 7,
       driverCostPlnPerHour: 42,
+      homeWarehouseId: 4,
     });
     expect(await screen.findByText("Truck WX 9009Z saved")).toBeInTheDocument();
     expect(listTrucks).toHaveBeenCalledTimes(2);
@@ -188,6 +204,7 @@ describe("TrucksPage", () => {
       baseConsumptionLPer100Km: 28,
       extraConsumptionFullLoadLPer100Km: 10,
       driverCostPlnPerHour: 50,
+      homeWarehouseId: 1,
     });
     expect(await screen.findByText("Truck WX 1001A saved")).toBeInTheDocument();
   });
@@ -245,6 +262,59 @@ describe("TrucksPage", () => {
 
     expect(await confirm.findByRole("alert")).toHaveTextContent(
       "Truck 1 not found.",
+    );
+  });
+
+  it("requires a home depot", async () => {
+    const { user } = renderWithProviders(<TrucksPage />);
+    await screen.findByText("WX 1001A");
+
+    await user.click(screen.getByRole("button", { name: "Add truck" }));
+    const form = dialog("Add truck");
+    await user.click(form.getByRole("button", { name: "Save truck" }));
+
+    expect(
+      form.getByRole("combobox", { name: /Home depot/ }),
+    ).toHaveAccessibleDescription(/Choose the home depot/);
+    expect(createTruck).not.toHaveBeenCalled();
+  });
+
+  it("marks a truck on route and back from the table", async () => {
+    setTruckAvailable.mockResolvedValueOnce({ ...TRUCK, available: false });
+    listTrucks
+      .mockResolvedValueOnce([TRUCK])
+      .mockResolvedValueOnce([{ ...TRUCK, available: false }]);
+    setTruckAvailable.mockResolvedValueOnce(TRUCK);
+    const { user } = renderWithProviders(<TrucksPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Mark WX 1001A on route" }),
+    );
+
+    expect(setTruckAvailable).toHaveBeenCalledWith(1, false);
+    expect(
+      await screen.findByText("Truck WX 1001A is on route"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("On route")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Mark WX 1001A available" }),
+    );
+    expect(setTruckAvailable).toHaveBeenLastCalledWith(1, true);
+  });
+
+  it("shows why the status could not be changed", async () => {
+    setTruckAvailable.mockRejectedValue(
+      new ApiError({ status: 0, code: "NETWORK", detail: "Cannot reach." }),
+    );
+    const { user } = renderWithProviders(<TrucksPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Mark WX 1001A on route" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "WX 1001A: Cannot reach.",
     );
   });
 });

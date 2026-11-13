@@ -66,6 +66,6 @@ class PlanStoreTest {
     }
 
     private static PlanResponse plan() {
-        return new PlanResponse(UUID.randomUUID(), null, null, null, null, null, null, List.of(), List.of());
+        return new PlanResponse(UUID.randomUUID(), null, null, null, null, null, null, List.of(), List.of(), null);
     }
 }

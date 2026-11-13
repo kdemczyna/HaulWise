@@ -35,8 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * The demo story end to end on the LOADED seed (seeding on, fixed clock): planning every WAW shipment on every
- * truck with the default request (return to depot, departure tomorrow 06:00) shows a non-zero cost of priority,
- * the pinned Gdansk delivery PO-1042 (deadline tomorrow 12:00) missed by OPTIMAL (arrives 23:18) and met by
+ * WAW-based truck (the five original trucks; T-32 forbids trucks of other depots) with the default request
+ * (return to depot, departure tomorrow 06:00) shows a non-zero cost of priority, the pinned Gdansk delivery PO-1042 (deadline tomorrow 12:00) missed by OPTIMAL (arrives 23:18) and met by
  * PRIORITY (10:51), and PO-1099 unassigned. Guards {@code seed/shipments.csv} against drift.
  */
 @SpringBootTest(properties = {
@@ -86,7 +86,8 @@ class PlanSeedDemoApiTest {
         String body = """
                 {"depotId": %d, "shipmentIds": %s, "truckIds": %s}
                 """.formatted(waw.getId(), json(wawShipments.stream().map(ShipmentResponse::id).toList()),
-                json(trucks.findAll().stream().map(Truck::getId).toList()));
+                json(trucks.findByHomeWarehouseIdAndAvailableTrueOrderById(waw.getId()).stream()
+                        .map(Truck::getId).toList()));
 
         String response = mvc.perform(post("/api/plans").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())

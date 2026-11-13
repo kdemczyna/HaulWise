@@ -3,7 +3,8 @@ package com.haulwise.dto;
 import com.haulwise.domain.Warehouse;
 
 /**
- * Origin/destination embedded in a {@link ShipmentResponse}, so the UI needs no extra lookup.
+ * Origin/destination embedded in a {@link ShipmentResponse} and the home depot in a {@link TruckResponse}, so
+ * the UI needs no extra lookup.
  */
 public record WarehouseSummary(Long id, String name, String city) {
 

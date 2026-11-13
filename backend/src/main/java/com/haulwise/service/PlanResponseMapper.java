@@ -69,7 +69,7 @@ final class PlanResponseMapper {
         }
         return new PlanResponse(id, createdAt, request, warehouse(depotId),
                 variant(result.optimal()), variant(result.priority()), DeltaResponse.from(result.delta()),
-                result.unassigned().stream().map(this::unassigned).toList(), warnings);
+                result.unassigned().stream().map(this::unassigned).toList(), warnings, null);
     }
 
     private PlanVariantResponse variant(PlanVariant variant) {

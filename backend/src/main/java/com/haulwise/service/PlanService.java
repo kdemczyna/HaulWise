@@ -90,8 +90,8 @@ public class PlanService {
     /**
      * Plans the selected shipments onto the selected trucks and stores the plan.
      *
-     * @throws RequestValidationException for invalid fields, unknown or duplicate ids, or shipments that do not
-     *         start at the depot - all reported together
+     * @throws RequestValidationException for invalid fields, unknown or duplicate ids, shipments that do not
+     *         start at the depot, or trucks based elsewhere or on route - all reported together
      */
     public PlanResponse create(PlanRequest request) {
         long started = System.nanoTime();
@@ -139,7 +139,10 @@ public class PlanService {
             checkOrigins(depot, selectedShipments, violations);
         }
         List<Truck> selectedTrucks = findAll("truckIds", "truck", request.truckIds(),
-                trucks::findAllById, Truck::getId, violations);
+                trucks::findWithHomeWarehouseByIdIn, Truck::getId, violations);
+        if (depot != null) {
+            checkTrucks(depot, selectedTrucks, violations);
+        }
         if (!violations.isEmpty()) {
             throw new RequestValidationException(violations);
         }
@@ -196,6 +199,24 @@ public class PlanService {
         if (!offenders.isEmpty()) {
             violations.add(new FieldViolation("shipmentIds", PlanWarnings.joinWithAnd(offenders)
                     + (offenders.size() == 1 ? " does" : " do") + " not start at depot " + depot.getName()));
+        }
+    }
+
+    /**
+     * Every selected truck is based at the depot (T-32) and not on route (T-33); one violation per offending truck
+     * and reason, so the dispatcher sees exactly which ticks to undo.
+     */
+    private static void checkTrucks(Warehouse depot, List<Truck> selected, List<FieldViolation> violations) {
+        for (Truck truck : selected) {
+            Warehouse home = truck.getHomeWarehouse();
+            if (!home.getId().equals(depot.getId())) {
+                violations.add(new FieldViolation("truckIds", "Truck %s is based at %s, not at %s."
+                        .formatted(truck.getPlate(), home.getName(), depot.getName())));
+            }
+            if (!truck.isAvailable()) {
+                violations.add(new FieldViolation("truckIds",
+                        "Truck %s is already on route.".formatted(truck.getPlate())));
+            }
         }
     }
 

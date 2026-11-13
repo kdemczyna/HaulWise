@@ -65,3 +65,17 @@ export function allWarnings(plan) {
   );
   return [...planLevel, ...routeLevel];
 }
+
+/** Trucks and shipment count that sending `variant` ("optimal" | "priority") affects. */
+export function dispatchScope(plan, variant) {
+  const routes = plan[variant].routes;
+  return {
+    plates: routes.map((route) => route.plate),
+    shipmentCount: routes.reduce(
+      (count, route) =>
+        count +
+        route.stops.reduce((sum, stop) => sum + stop.shipmentIds.length, 0),
+      0,
+    ),
+  };
+}

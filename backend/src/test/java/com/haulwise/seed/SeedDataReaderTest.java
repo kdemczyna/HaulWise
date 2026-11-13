@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
@@ -75,7 +76,35 @@ class SeedDataReaderTest {
                         tuple("WX 2002B", 33, 24000, 29.0, 10.0, 45.0),
                         tuple("WX 3003C", 18, 12000, 22.0, 7.0, 42.0),
                         tuple("WX 4004D", 10, 6000, 18.0, 5.0, 40.0),
-                        tuple("PO 5005E", 33, 24000, 27.0, 10.0, 45.0));
+                        tuple("PO 5005E", 33, 24000, 27.0, 10.0, 45.0),
+                        tuple("PO 6006F", 33, 24000, 28.0, 10.0, 45.0),
+                        tuple("PO 7007G", 28, 18000, 24.0, 8.0, 42.0));
+        assertThat(data.trucks())
+                .extracting(truck -> truck.getHomeWarehouse().getName(), Truck::isAvailable)
+                .containsExactly(
+                        tuple("WAW Central", true), tuple("WAW Central", true), tuple("WAW Central", true),
+                        tuple("WAW Central", true), tuple("WAW Central", true),
+                        tuple("POZ West", true), tuple("POZ West", true));
+    }
+
+    /**
+     * POZ West's own shipments (26 pallets, 17 100 kg) fit either POZ truck alone, so recommending trucks there
+     * is a genuine choice between PO 6006F, PO 7007G and both.
+     */
+    @Test
+    void eachPozTruckAloneCarriesEveryPozShipment() {
+        SeedData data = new SeedDataReader(validator).read(NOW);
+        List<Shipment> poz = data.shipments().stream()
+                .filter(s -> s.getOrigin().getName().equals("POZ West")).toList();
+        int pallets = poz.stream().mapToInt(Shipment::getPallets).sum();
+        int weightKg = poz.stream().mapToInt(Shipment::getWeightKg).sum();
+
+        assertThat(data.trucks()).filteredOn(t -> t.getHomeWarehouse().getName().equals("POZ West"))
+                .hasSize(2)
+                .allSatisfy(truck -> {
+                    assertThat(truck.getCapacityPallets()).isGreaterThanOrEqualTo(pallets);
+                    assertThat(truck.getPayloadKg()).isGreaterThanOrEqualTo(weightKg);
+                });
     }
 
     @Test
@@ -204,8 +233,8 @@ class SeedDataReaderTest {
     @Test
     void truckOutsideApiRangesFailsWithLine() {
         SeedDataReader reader = readerWith(SeedDataReader.TRUCKS, """
-                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour
-                WX 1001A,41,24000,28,10,45
+                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour,home_warehouse
+                WX 1001A,41,24000,28,10,45,WAW Central
                 """);
 
         assertThatThrownBy(() -> reader.read(NOW))
@@ -216,13 +245,30 @@ class SeedDataReaderTest {
     @Test
     void duplicatePlateAfterNormalisationFails() {
         SeedDataReader reader = readerWith(SeedDataReader.TRUCKS, """
-                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour
-                WX 1001A,33,24000,28,10,45
-                wx  1001a,33,24000,28,10,45
+                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour,home_warehouse
+                WX 1001A,33,24000,28,10,45,WAW Central
+                wx  1001a,33,24000,28,10,45,WAW Central
                 """);
 
         assertThatThrownBy(() -> reader.read(NOW))
                 .hasMessage("seed/trucks.csv line 3: duplicate truck plate 'WX 1001A'");
+    }
+
+    @Test
+    void truckWithUnknownOrMissingHomeDepotFails() {
+        SeedDataReader unknown = readerWith(SeedDataReader.TRUCKS, """
+                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour,home_warehouse
+                WX 1001A,33,24000,28,10,45,Nowhere
+                """);
+        SeedDataReader blank = readerWith(SeedDataReader.TRUCKS, """
+                plate,capacity_pallets,payload_kg,base_consumption_l_per_100km,extra_consumption_full_load_l_per_100km,driver_cost_pln_per_hour,home_warehouse
+                WX 1001A,33,24000,28,10,45,
+                """);
+
+        assertThatThrownBy(() -> unknown.read(NOW))
+                .hasMessage("seed/trucks.csv line 2: unknown warehouse 'Nowhere' (not in warehouses.csv)");
+        assertThatThrownBy(() -> blank.read(NOW))
+                .hasMessage("seed/trucks.csv line 2: home_warehouse is blank");
     }
 
     @Test

@@ -1,4 +1,10 @@
-import { allWarnings, minutesLate, sameRoute, unusedTruckIds } from "./plan.js";
+import {
+  allWarnings,
+  dispatchScope,
+  minutesLate,
+  sameRoute,
+  unusedTruckIds,
+} from "./plan.js";
 
 const stop = (warehouseId) => ({ warehouseId });
 
@@ -70,5 +76,34 @@ describe("unusedTruckIds and allWarnings", () => {
       ["ESTIMATED_DISTANCE", null],
       ["DEADLINE_MISSED", "optimal"],
     ]);
+  });
+});
+
+describe("dispatchScope", () => {
+  const route = (plate, shipmentIdsPerStop) => ({
+    plate,
+    stops: shipmentIdsPerStop.map((shipmentIds) => ({ shipmentIds })),
+  });
+  const plan = {
+    optimal: { routes: [route("WX 1001A", [[1, 2], [3]])] },
+    priority: { routes: [route("WX 1001A", [[3]]), route("WX 2002B", [[4]])] },
+  };
+
+  it("counts the routed trucks and every shipment on their stops per variant", () => {
+    expect(dispatchScope(plan, "optimal")).toEqual({
+      plates: ["WX 1001A"],
+      shipmentCount: 3,
+    });
+    expect(dispatchScope(plan, "priority")).toEqual({
+      plates: ["WX 1001A", "WX 2002B"],
+      shipmentCount: 2,
+    });
+  });
+
+  it("is empty when nothing was loaded", () => {
+    expect(dispatchScope({ optimal: { routes: [] } }, "optimal")).toEqual({
+      plates: [],
+      shipmentCount: 0,
+    });
   });
 });
