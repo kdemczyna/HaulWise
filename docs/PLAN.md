@@ -47,7 +47,7 @@
 
 **Entities (all CRUD):**
 - **Warehouse**: name, city, lat, lon.
-- **Truck**: plate, capacity (pallets), payload (kg), base consumption (L/100km), extra consumption per load, driver cost per hour.
+- **Truck**: plate, capacity (pallets), payload (kg), base consumption (L/100km), extra consumption per load, driver cost per hour; post-MVP also a home depot (US-16) and an available / on-route flag (US-17).
 - **Shipment**: origin, destination, pallets, weight (kg), priority (URGENT / HIGH / NORMAL), optional deadline, pinned-first flag.
 - **Plan / Route** (result, not hand-edited): trucks, ordered stops, km, time, fuel litres, cost, warnings.
 - **Settings**: diesel price PLN/L, average speed fallback, priority weights, EU compliance parameters.
@@ -111,12 +111,14 @@
   - AC: the optimal and priority plans are shown side by side; a plain-language sentence states the delta in km, PLN and time; if priority costs nothing, the UI says "no extra cost"; delta values are computed by code and covered by tests.
 - **US-8 See the route.** As a dispatcher I see trucks and stops on a map and on a timeline.
   - AC: each truck has a colour; markers numbered by stop order; per-truck timeline with arrival times; utilisation bar (pallets and kg); warnings visible.
+US-9 to US-13 were not built: their tasks (T-22..T-28) were cut in lean mode to protect the must-haves. The compliance and consolidation settings exist and are editable (T-07, T-31) but nothing uses them yet.
+
 - **US-9 Compliance (Should).** AC: driving time per truck checked against configurable limits; a violation shows a warning with the segment and a suggested break; limits editable in settings.
 - **US-10 Consolidation (Should).** AC: when two trucks to the same region are both below a configured fill threshold and fit together, a suggestion shows the saving in PLN and km.
 - **US-11 AI order entry (Should).** AC: with a key, pasted free text fills the shipment form for review (never auto-saves); a short plan summary is available; without a key the controls are hidden and nothing errors; numbers in the summary come only from code.
 - **US-12 KPI dashboard (Extra).** AC: fill rate, cost per pallet and empty km per truck and per plan.
 - **US-13 Urgent re-plan (Extra).** AC: adding an urgent shipment to an existing plan shows which trucks and stops change and the cost delta.
-- **US-14 Truck recommendation (Extra, added post-MVP 2026-11-13).** AC: given a depot and selected shipments, the app suggests which trucks to use from the whole fleet (not just the ones already ticked), picking the cheapest combination that fits everything; the dispatcher sees why (cost, utilisation) and can still change the selection by hand before planning.
+- **US-14 Truck recommendation (Extra, added post-MVP 2026-11-13).** AC: given a depot and selected shipments, the app suggests which trucks to use from the whole fleet (not just the ones already ticked; since US-16/US-17 the whole *available* fleet based at that depot), picking the cheapest combination that fits everything; the dispatcher sees why (cost, utilisation) and can still change the selection by hand before planning.
 - **US-15 Editable settings (Extra, added post-MVP 2026-11-13).** AC: diesel price, average speed, road factor, priority weights and the EU driving-time limits are editable from the Settings page (not only via the API), with the same validation ranges as the backend and a success notification on save.
 - **US-16 Truck home depot (Extra, added post-MVP 2026-11-14).** AC: every truck has a home warehouse; a plan can only use trucks based at the chosen depot, enforced by the API (not just hidden in the UI); the Trucks page shows and can set a truck's home depot; adding trucks at other depots doesn't slow down planning or recommending trucks at depots with a small fleet.
 - **US-17 Dispatch a plan / "Send trucks" (Extra, added post-MVP 2026-11-14).** AC: from a plan result, "Send trucks" marks every truck actually used in the shown variant as on-route (unavailable for new plans) and removes every shipment that was routed in it (shipments left unassigned by the plan are untouched); nothing in-app represents messaging drivers — this only records the dispatch; a truck can be marked available again by hand on the Trucks page; sending the same plan twice is refused with a clear message, not a crash or a double delete.
@@ -155,17 +157,17 @@ Each task is about 1-3 hours.
 - [x] **T-19** Frontend tests (Vitest/RTL, small set: forms, delta display, warnings). (Must)
 - [x] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
 - [x] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
-- [ ] **T-22** EU driving-time compliance check (verify rules, configurable) + UI warning. (Should)
-- [ ] **T-23** Load consolidation suggestion with saving. (Should)
-- [ ] **T-24** Feature flag endpoint + AI order parsing (Claude API, key from env). Key set but model empty = AI disabled (or default the model). (Should)
-- [ ] **T-25** AI plan summary (prompt receives computed numbers only). (Should)
-- [ ] **T-26** Optional OSRM table refresh with cache. (Should, only if time)
-- [ ] **T-27** KPI dashboard: fill rate, cost per pallet, empty km. (Extra)
-- [ ] **T-28** Urgent re-plan with change list and cost delta. (Extra)
-- [ ] **T-29** Final QA: clean-clone run, no-API-key run, offline run, seed sanity, lint/format. (Must)
+- [ ] **T-22** EU driving-time compliance check (verify rules, configurable) + UI warning. (Should) - **cut** (lean mode)
+- [ ] **T-23** Load consolidation suggestion with saving. (Should) - **cut** (lean mode)
+- [ ] **T-24** Feature flag endpoint + AI order parsing (Claude API, key from env). Key set but model empty = AI disabled (or default the model). (Should) - **cut** (lean mode)
+- [ ] **T-25** AI plan summary (prompt receives computed numbers only). (Should) - **cut** (lean mode)
+- [ ] **T-26** Optional OSRM table refresh with cache. (Should, only if time) - **cut** (lean mode)
+- [ ] **T-27** KPI dashboard: fill rate, cost per pallet, empty km. (Extra) - **cut** (lean mode)
+- [ ] **T-28** Urgent re-plan with change list and cost delta. (Extra) - **cut** (lean mode)
+- [x] **T-29** Final QA: clean-clone run, no-API-key run, offline run, seed sanity, lint/format. (Must) - merged with `docs/readme-final-qa`
 
 ### Post-MVP extras (added 2026-11-13, time allowed after T-29)
-- [x] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet, pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
+- [x] **T-30** Truck recommendation: given a depot + selected shipments, search combinations of the full truck fleet (since T-32/T-33: the depot's available trucks), pick the cheapest that fits everything, expose it via the API and a "Recommend trucks" button on the plan form. (Extra, US-14)
 - [x] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
 - [x] **T-32** Truck home depot: `homeWarehouseId` on Truck; keep the existing 5 WAW Central trucks unchanged (preserves the demo numbers byte-for-byte), add new trucks at POZ West (and optionally elsewhere) sized for its own shipments; `POST /api/plans` and `/api/trucks/recommend` only consider trucks homed at the chosen depot (400/no-candidate, never a cross-depot result); Trucks CRUD shows/sets the home depot; Plan form's truck checklist filters by the selected depot. A test must prove a bigger fleet at one depot doesn't slow down planning at another. (Extra, US-16)
 - [x] **T-33** Dispatch a plan ("Send trucks"): `available` flag on Truck (toggle by hand on the Trucks page, reusing truck CRUD); `POST /api/plans/{id}/dispatch` (chosen variant) marks its routed trucks unavailable and deletes its routed shipments, idempotent (a second dispatch of the same plan is refused with a clear message, not a crash); plans and recommendations also exclude unavailable trucks (depends on T-32). (Extra, US-17)
@@ -186,12 +188,12 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | 6 | `feature/plan-ui` | T-16, T-17 |
 | 7 | `test/api-and-ui-tests` | T-18, T-19 (done on `feature/plan-ui`, lean shortcut) |
 | 8 | `feature/ux-polish` | T-20 (done on `feature/plan-ui`, lean shortcut) |
-| 9 | `feature/compliance-consolidation` | T-22, T-23 |
-| 10 | `feature/ai-assist` | T-24, T-25 |
-| 11 | `feature/osrm-refresh` | T-26 |
-| - | `feature/kpi-and-replan` | T-27, T-28 (only if time) |
+| 9 | `feature/compliance-consolidation` | T-22, T-23 (never created - tasks cut) |
+| 10 | `feature/ai-assist` | T-24, T-25 (never created - tasks cut) |
+| 11 | `feature/osrm-refresh` | T-26 (never created - task cut) |
+| - | `feature/kpi-and-replan` | T-27, T-28 (never created - tasks cut) |
 | 12 | `docs/readme-final-qa` | T-21, T-29 (always last, so the README describes what was built) |
-| 13 | `feature/extras` | T-30, T-31 (post-MVP, after T-29; merged last, README not re-run) |
+| 13 | `feature/extras` | T-30, T-31 (post-MVP, after T-29; README not re-run at that point) |
 | 14 | `feature/fleet-ops` | T-32, T-33 (post-MVP, after T-30/T-31; home depot and dispatch share the same "available truck pool per depot" concept) |
 
 ### CUT LINE

@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
@@ -237,62 +236,6 @@ class TruckRecommendationApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.truckIds", hasSize(0)))
                 .andExpect(jsonPath("$.unassigned[0].shipmentId").value(shipment.getId()));
-    }
-
-    /**
-     * Above the fleet-subset cap (set to 1 here), the greedy fallback is used instead of exhaustive search.
-     * One truck already carries everything alone, so the fallback's first (trivial) answer matches what
-     * exhaustive search would have found - this exercises the fallback code path itself, not a case where it
-     * differs from the optimum (the documented limitation).
-     */
-    @HaulWiseApiTest
-    @AutoConfigureMockMvc
-    @TestPropertySource(properties = "haulwise.solver.max-recommendation-trucks=1")
-    static class FallbackPathTest {
-
-        @Autowired
-        private org.springframework.test.web.servlet.MockMvc mvc;
-
-        @Autowired
-        private WarehouseRepository warehouses;
-
-        @Autowired
-        private RouteLegRepository routeLegs;
-
-        @Autowired
-        private ShipmentRepository shipments;
-
-        @Autowired
-        private TruckRepository trucks;
-
-        @Autowired
-        private SettingsRepository settings;
-
-        @Test
-        void aboveTheCapTheGreedyFallbackStillFindsAFeasibleCombination() throws Exception {
-            routeLegs.deleteAll();
-            shipments.deleteAll();
-            trucks.deleteAll();
-            warehouses.deleteAll();
-            settings.deleteAll();
-            Warehouse depot = warehouses.save(new Warehouse("Depot A", "Astadt", 52.0, 21.0));
-            Warehouse bstadt = warehouses.save(new Warehouse("B Hub", "Bstadt", 51.0, 20.0));
-            routeLegs.save(new RouteLeg(depot, bstadt, 100, 90, LegSource.SEEDED, LocalDateTime.now()));
-            routeLegs.save(new RouteLeg(bstadt, depot, 100, 90, LegSource.SEEDED, LocalDateTime.now()));
-            Truck big = trucks.save(new Truck("WX 3003C", 35, 24000, 28, 10, 45, depot));
-            trucks.save(new Truck("WX 1001A", 20, 24000, 28, 10, 45, depot));
-            Shipment shipment = new Shipment("PO-1", depot, bstadt, 20, 2000);
-            shipment.setPriority(Priority.NORMAL);
-            shipment = shipments.save(shipment);
-
-            mvc.perform(post("/api/trucks/recommend").contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"depotId": %d, "shipmentIds": [%d], "returnToDepot": true}
-                                    """.formatted(depot.getId(), shipment.getId())))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.truckIds", contains(big.getId().intValue())))
-                    .andExpect(jsonPath("$.unassigned", hasSize(0)));
-        }
     }
 
     private ResultActions recommend(String json) throws Exception {

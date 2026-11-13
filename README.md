@@ -4,6 +4,8 @@ A dispatcher tool for a fictional Polish logistics company that moves goods betw
 
 **Headline feature: "cost of priority".** The app runs the solver twice — once ignoring priorities (optimal) and once respecting them (priority) — and shows both plans side by side with a plain-language delta, e.g. *"Delivering Gdansk first costs 292.97 PLN more (85 km and 1 h 15 min longer)."*
 
+Beyond that core comparison, a dispatcher can: have the app **recommend which trucks to use** for a chosen shipment set (the cheapest fleet combination that fits, even if it uses more trucks than another combination); only pick **trucks based at the chosen depot** (every truck has a home warehouse, enforced server-side, not just hidden in the UI); **"Send trucks"** on a finished plan, which marks its trucks on-route and removes its shipments from the pending list (a truck is freed again by hand once it's back); and **edit every solver setting** (diesel price, speed, priority weights, EU driving-time limits) from the Settings page instead of only via the API.
+
 This is a recruitment-task project: a small, readable, deterministic solver (bin packing + stop ordering + a fuel/cost model) that the author can fully explain, rather than a black-box optimisation library.
 
 ## Screenshots
@@ -62,14 +64,16 @@ Base path `/api`, JSON only, errors as RFC 9457 `application/problem+json` with 
 | Method | Path | Purpose |
 |---|---|---|
 | GET/POST/PUT/DELETE | `/api/warehouses[/{id}]` | CRUD for warehouses |
-| GET/POST/PUT/DELETE | `/api/trucks[/{id}]` | CRUD for the truck fleet |
+| GET/POST/PUT/DELETE | `/api/trucks[/{id}]` | CRUD for the truck fleet (each truck has a home depot and an available/on-route flag) |
 | GET/POST/PUT/DELETE | `/api/shipments[/{id}]` | CRUD for shipments (filterable by `priority`, `originId`) |
 | GET | `/api/settings` | Read diesel price, speed fallback, priority weights, compliance limits |
 | PUT | `/api/settings` | Replace the settings row |
 | GET | `/api/distances` | Full warehouse-to-warehouse distance/time matrix (seeded, with estimated fallbacks) |
 | POST | `/api/distances/refresh` | Refresh the matrix from OSRM (optional, not implemented — see Future work) |
+| POST | `/api/trucks/recommend` | Given a depot and shipments, recommend the cheapest combination of that depot's own available trucks that carries everything |
 | POST | `/api/plans` | Create a plan: pick a depot, shipments and trucks, get back the optimal plan, the priority plan and the cost-of-priority delta |
 | GET | `/api/plans/{id}` | Re-fetch a previously created plan by id |
+| POST | `/api/plans/{id}/dispatch` | "Send trucks": mark the chosen plan variant's routed trucks on-route and remove its routed shipments (idempotent — sending the same plan twice is refused, not repeated) |
 
 ## Algorithm
 
@@ -89,6 +93,25 @@ This README, the application code, and the accompanying `docs/PLAN.md` / `docs/A
 
 Note: HaulWise's own **optional AI integration** (parsing a plain-language order into a shipment form, or summarising a plan) is part of the original plan but is **not implemented** in this build — the app works fully, and always, without any API key.
 
+### Working with an AI agent team
+
+The implementation was done by a small team of specialised AI agents (Claude Code subagents), defined in [`.claude/agents/`](.claude/agents/) and coordinated by a human through one orchestrating session, not by prompting a single model turn by turn:
+
+- **`planner`** turned the brief into `docs/PLAN.md` — scope, user stories and a task breakdown (`T-01`, `T-02`, …) — which the user approved before any code was written.
+- **`architect`** turned the plan into `docs/ARCHITECTURE.md` — stack, data model, API contract and a running decision log — which the user approved before implementation started.
+- **`developer`** implemented one task (or a small related group) at a time on a dedicated feature branch, then fixed whatever the review found.
+- **`code-reviewer`** reviewed every task's diff before it was committed, read-only, checking correctness, security, test coverage and conformance to the architecture doc.
+- **`qa-tester`** ran the actual app in a browser against the acceptance criteria before a branch was merged, as a dispatcher would use it, not just by reading the code.
+
+**The process itself changed twice, on purpose, and that's recorded in `docs/PLAN.md`/`CLAUDE.md` as it happened:**
+
+1. **Early on, the loop got *stricter*.** After noticing that a developer's fixes were never actually re-checked, a rule was added: whenever a review found a Blocker- or Major-severity issue, the fix went back to the reviewer for a second pass on just that diff before it could be committed — and a QA pass (in a real browser, against the running app) was added before merging any branch into `main`.
+2. **Partway through, with the project's two-to-three-day budget at risk, the loop was deliberately leaned out.** The team burned through a multi-hour usage allowance in about an hour, almost entirely in agent-to-agent review cycles rather than the user's own messages, so the rules were relaxed to fit the clock: re-review was restricted to genuine Blockers (a Major or Minor finding's fix is checked directly instead of through a second agent pass); the `code-reviewer` and `qa-tester` agents moved to a cheaper, faster model while `developer` — the actual implementation work — stayed on the stronger one; several related frontend tasks were reviewed and QA'd together instead of one round each; and the explicitly should-have/nice-to-have scope (EU driving-time compliance, load consolidation, AI-assisted order entry, a live OSRM refresh, a KPI dashboard) was cut to protect the must-have deadline.
+
+That leaner process is also what let the project go *beyond* the original MVP once the must-haves were done and merged: truck recommendation, the editable Settings page, truck home depots and dispatching a plan were all added afterward, each still going through the same build → review → fix → QA loop, just the faster version of it.
+
+**One moment showed exactly why a verification step stays in even the leaner loop, and why that step itself can't be trusted blindly either.** While building the recommendation feature, an agent noticed a test (a `static` nested class with no `@Nested` annotation) and flagged that it might never actually execute, for the wrong reason (it guessed Maven Surefire excludes nested classes by name pattern — it doesn't). A review agent then checked this empirically, found what looked like a passing test report for that exact class, and reported the concern as a false alarm. Neither conclusion was reliable: the "report" the review had found was a stale file left over from an earlier, manually-targeted run, not from a real `mvnw verify`. A later documentation audit re-opened the question, and the only way to settle it for certain was a mutation test — deliberately break the test's own assertion and see whether a truly clean build actually fails. It didn't: the test had silently never run at all, confirming a real (if narrow) gap in a previously-merged feature's coverage. The fix was to promote it to an ordinary top-level test class; the same mutation check (break it, confirm the clean build now fails; fix it, confirm the build passes) proved the fix actually worked, rather than trusting a third report on faith. The lesson carried into how later findings in this project were handled: a surprising claim from one agent is a reason to verify directly, not to repeat it — and that includes claims from the *verification* step itself.
+
 ## Future work
 
 - **e-TOLL**: Polish road toll calculation (e-TOLL) is out of scope for this task; it would be a natural extension once routes carry real road geometry rather than straight lines between stops.
@@ -100,7 +123,8 @@ Note: HaulWise's own **optional AI integration** (parsing a plain-language order
 - **Daylight-saving transitions are ignored.** Times are plain local `LocalDateTime` values (Europe/Warsaw); a plan whose timeline crosses a DST change will be off by an hour.
 - **Nothing is persisted across restarts.** The database is in-memory (H2) and plans live in an in-memory store; both are lost when the backend restarts, and the demo reseeds from scratch.
 - **Shipments cannot be split across trucks.** A shipment is atomic — it is assigned whole to one truck, or reported unassigned if it fits none.
-- **Settings are not yet editable from the UI.** `GET`/`PUT /api/settings` work via the API/Swagger, but the Settings page in the frontend is currently a placeholder.
+- **A truck's home depot only changes when edited by hand, and dispatch only tracks availability, not live location.** "Send trucks" marks a truck on-route and a dispatcher marks it available again by hand on the Trucks page once it's back — the app never infers *where* an on-route truck currently is or auto-returns it after its route finishes.
+- **Truck recommendation only searches one depot's own fleet, and only up to a cap.** `/api/trucks/recommend` tries every combination of a depot's available trucks when there are at most `haulwise.solver.max-recommendation-trucks` of them (default 7; the startup-validated limit of 12 measured ~21 s per request, so the default stays well under that); above the cap it falls back to a documented, not-guaranteed-optimal greedy approach.
 - **The map needs internet access** for OpenStreetMap tiles; offline, it degrades to an inline notice while the stop list and timeline (the full text alternative) remain fully usable.
 - **Moving a warehouse resets its distance legs to estimates.** Updating a warehouse's coordinates deletes its stored legs (they would be stale); moving it back to the old coordinates does **not** restore the original seeded legs — they stay estimated (haversine × road factor) until the database is reseeded on a restart.
 - **A pin can delay a different urgent shipment.** The hard "pin first" rule only guarantees the pinned stop is visited first on its truck; it can push a non-pinned URGENT shipment on the same truck later than it would otherwise go, which QA observed and is intentional (documented) solver behaviour, not a bug.
@@ -114,10 +138,10 @@ Loaded automatically by `SeedDataLoader` on every startup when `HAULWISE_SEED_EN
 
 - **9 warehouses**: WAW Central (Warsaw), KRK South (Krakow), GDN Port (Gdansk), POZ West (Poznan), WRO Hub (Wroclaw), LDZ Cross-dock (Lodz), KTW Silesia (Katowice), LUB East (Lublin), SZZ North-West (Szczecin).
 - **An approximate distance/time matrix** between all 9 (seeded km/minutes, not real road data — see Known limitations).
-- **5 trucks** of varying capacity (10–33 pallets, 6,000–24,000 kg) and consumption profiles.
+- **7 trucks** of varying capacity (10–33 pallets, 6,000–24,000 kg) and consumption profiles: 5 based at WAW Central and 2 at POZ West, all available at startup.
 - **14 shipments**, 11 from WAW Central and 3 from POZ West, covering a mix of priorities and sizes, including: an URGENT shipment to Lublin with a deadline tomorrow 20:00, a HIGH, pinned-first shipment to Gdansk with a deadline tomorrow 12:00 (the shipment the *optimal* plan misses but the *priority* plan meets — the core "cost of priority" story), and one oversized shipment (36 pallets) that exceeds every truck, demonstrating the "unassigned" path.
 
-Running the default WAW Central demo (all 11 WAW shipments, all 5 trucks, return to depot, departure tomorrow 06:00) reproduces the numbers documented in `docs/ARCHITECTURE.md` section 4.1: a delta of roughly +85 km / +75 min / +293 PLN between the optimal and priority plans.
+Running the default WAW Central demo (all 11 WAW shipments, all 5 WAW Central trucks, return to depot, departure tomorrow 06:00) reproduces the numbers documented in `docs/ARCHITECTURE.md` section 4.1: a delta of roughly +85 km / +75 min / +293 PLN between the optimal and priority plans.
 
 ## Environment variables
 
@@ -133,4 +157,4 @@ See `backend/.env.example` and `frontend/.env.example` for the full, commented l
 npm.cmd test
 ```
 
-As of this README, the backend suite has **422 tests** (JUnit 5, solver unit tests, an architecture-purity guard, and Spring MockMvc API integration tests, including CORS) all passing, and the frontend suite has **147 tests** across 16 files (Vitest + React Testing Library) all passing. `.\mvnw.cmd -q -B verify` and `npm.cmd test` were both run clean while writing this document.
+As of this README, the backend suite has **459 tests** (JUnit 5, solver unit tests, an architecture-purity guard, and Spring MockMvc API integration tests, including CORS) all passing, and the frontend suite has **171 tests** across 17 files (Vitest + React Testing Library) all passing. `.\mvnw.cmd -q -B verify` and `npm.cmd test` were both run clean while writing this document.
