@@ -150,7 +150,7 @@ Each task is about 1-3 hours.
 - [x] **T-18** Backend API tests (MockMvc: CRUD, validation, 409, CORS, plan endpoint). (Must)
 - [x] **T-19** Frontend tests (Vitest/RTL, small set: forms, delta display, warnings). (Must)
 - [x] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
-- [ ] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
+- [x] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
 - [ ] **T-22** EU driving-time compliance check (verify rules, configurable) + UI warning. (Should)
 - [ ] **T-23** Load consolidation suggestion with saving. (Should)
 - [ ] **T-24** Feature flag endpoint + AI order parsing (Claude API, key from env). Key set but model empty = AI disabled (or default the model). (Should)
