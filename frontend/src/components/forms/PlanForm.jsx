@@ -200,6 +200,7 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
     form.clearFieldError("shipmentIds");
     form.setFieldValue("truckIds", null);
     form.clearFieldError("truckIds");
+    setRecommendation({ loading: false, note: null, error: null });
   };
 
   const depotOptions = [

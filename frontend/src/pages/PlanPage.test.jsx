@@ -238,6 +238,30 @@ describe("PlanPage", () => {
     ).not.toBeChecked();
   });
 
+  it("clears the recommendation note when the depot changes", async () => {
+    recommendTrucks.mockResolvedValue({
+      truckIds: [1],
+      trucks: [{ id: 1, plate: "WX 1001A" }],
+      totals: { costPln: 412 },
+      utilisationPct: 100,
+      unassigned: [],
+    });
+    const { user } = renderPage();
+    await chooseDepot(user);
+    await user.click(screen.getByRole("button", { name: "Recommend trucks" }));
+    await screen.findByText(
+      "Recommended: WX 1001A — 100% pallets, 412.00 PLN estimated",
+    );
+
+    await chooseDepot(user, "GDN Port (Gdansk)");
+
+    expect(
+      screen.queryByText(
+        "Recommended: WX 1001A — 100% pallets, 412.00 PLN estimated",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("is disabled until a depot and a shipment are selected", async () => {
     const { user } = renderPage();
 
