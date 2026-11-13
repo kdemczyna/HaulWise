@@ -64,7 +64,8 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.info.description", containsString("distance")))
                 .andExpect(jsonPath("$.info.description", containsString("plan runs")))
                 .andExpect(jsonPath("$.tags[*].name")
-                        .value(contains("Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans")))
+                        .value(contains("Warehouses", "Trucks", "Shipments", "Settings", "Distances", "Plans",
+                                "Recommendations")))
                 .andExpect(jsonPath("$.tags[*].description").value(everyItem(not(emptyOrNullString()))));
     }
 

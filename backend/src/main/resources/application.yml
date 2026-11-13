@@ -37,6 +37,11 @@ haulwise:
     enabled: ${HAULWISE_SEED_ENABLED:true}
   solver:
     max-brute-force-stops: 8
+    # Kept well under the 12 startup-validated limit: at the limit, enumerating every subset of a
+    # fleet this size with max-brute-force-stops-sized routes measured ~21s per request (see
+    # ARCHITECTURE.md); 7 (127 subsets) keeps the synchronous /api/trucks/recommend call well under
+    # typical browser/proxy timeouts while still covering the seeded 5-truck demo fleet with headroom.
+    max-recommendation-trucks: 7
   osrm:
     base-url: ${HAULWISE_OSRM_BASE_URL:https://router.project-osrm.org}
     truck-duration-factor: 1.2
