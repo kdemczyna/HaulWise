@@ -7,8 +7,8 @@ import java.util.List;
 
 /**
  * Response of {@code POST /api/trucks/recommend} (ARCHITECTURE section 5, T-30): the cheapest combination of
- * the full fleet that carries every requested shipment, or - when none does, not even the whole fleet - the
- * shipments that do not fit anywhere and why.
+ * the depot's available fleet that carries every requested shipment, or - when none does, not even that whole
+ * fleet - the shipments that do not fit anywhere and why.
  *
  * @param truckIds recommended truck ids, ascending; empty when infeasible
  * @param trucks the same trucks, with their plate; empty when infeasible

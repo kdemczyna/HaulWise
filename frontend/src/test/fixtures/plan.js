@@ -124,6 +124,7 @@ const RETURN_LEG = {
 export const DEMO_PLAN = {
   id: "91eed3bb-a328-4f46-bd7f-0e74a2030492",
   createdAt: "2026-11-13T10:00:00",
+  dispatchedAt: null,
   request: {
     depotId: 1,
     shipmentIds: [1, 2, 3, 4, 11],

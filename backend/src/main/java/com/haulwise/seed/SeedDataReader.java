@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.core.io.ClassPathResource;
 
 /**
@@ -50,7 +51,8 @@ public final class SeedDataReader {
 
     private static final List<String> WAREHOUSE_HEADER = List.of("name", "city", "lat", "lon");
     private static final List<String> TRUCK_HEADER = List.of("plate", "capacity_pallets", "payload_kg",
-            "base_consumption_l_per_100km", "extra_consumption_full_load_l_per_100km", "driver_cost_pln_per_hour");
+            "base_consumption_l_per_100km", "extra_consumption_full_load_l_per_100km", "driver_cost_pln_per_hour",
+            "home_warehouse");
     private static final List<String> SHIPMENT_HEADER = List.of("reference", "origin", "destination", "pallets",
             "weight_kg", "priority", "pinned_first", "deadline_day", "deadline_time");
 
@@ -72,7 +74,7 @@ public final class SeedDataReader {
      */
     public SeedData read(LocalDateTime now) {
         Map<String, Warehouse> warehousesByName = readWarehouses();
-        List<Truck> trucks = readTrucks();
+        List<Truck> trucks = readTrucks(warehousesByName);
         List<Shipment> shipments = readShipments(warehousesByName, now.toLocalDate().plusDays(1));
         List<RouteLeg> legs = readLegs(warehousesByName, now);
         return new SeedData(List.copyOf(warehousesByName.values()), trucks, shipments, legs);
@@ -92,20 +94,25 @@ public final class SeedDataReader {
         return byName;
     }
 
-    private List<Truck> readTrucks() {
+    private List<Truck> readTrucks(Map<String, Warehouse> warehousesByName) {
         List<Truck> trucks = new ArrayList<>();
         Set<String> plates = new HashSet<>();
         for (SeedCsv.Row row : readCsv(TRUCKS, TRUCK_HEADER)) {
+            Warehouse home = resolve(warehousesByName, row.requiredText("home_warehouse"), row::error);
+            // The seed names the home depot instead of an id (resolved above), so its id is not validated here.
             TruckRequest request = new TruckRequest(row.text("plate"), row.integer("capacity_pallets"),
                     row.integer("payload_kg"), row.decimal("base_consumption_l_per_100km"),
-                    row.decimal("extra_consumption_full_load_l_per_100km"), row.decimal("driver_cost_pln_per_hour"));
-            requireValid(row, validator.validate(request));
+                    row.decimal("extra_consumption_full_load_l_per_100km"), row.decimal("driver_cost_pln_per_hour"),
+                    null, null);
+            requireValid(row, validator.validate(request).stream()
+                    .filter(violation -> !violation.getPropertyPath().toString().equals("homeWarehouseId"))
+                    .collect(Collectors.toSet()));
             if (!plates.add(request.plate())) {
                 throw row.error("duplicate truck plate '" + request.plate() + "'");
             }
             trucks.add(new Truck(request.plate(), request.capacityPallets(), request.payloadKg(),
                     request.baseConsumptionLPer100Km(), request.extraConsumptionFullLoadLPer100Km(),
-                    request.driverCostPlnPerHour()));
+                    request.driverCostPlnPerHour(), home));
         }
         return List.copyOf(trucks);
     }

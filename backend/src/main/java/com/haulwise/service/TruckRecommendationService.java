@@ -45,12 +45,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Recommends which trucks of the <em>whole fleet</em> to use for a depot + shipment selection (ARCHITECTURE
- * section 5, T-30): the cheapest combination that carries everything, considering the full fleet rather than
- * only the trucks the dispatcher already ticked.
+ * Recommends which trucks of the depot's <em>whole available fleet</em> to use for a depot + shipment selection
+ * (ARCHITECTURE section 5, T-30): the cheapest combination that carries everything, considering every truck based
+ * at the depot (T-32) and not on route (T-33) rather than only the trucks the dispatcher already ticked.
  * <p>
  * Validation mirrors {@link PlanService} (ids exist, shipments start at the depot, 1..200 ids), minus the
- * truck selection - here every truck is a candidate.
+ * truck selection - here every available truck based at the depot is a candidate.
  * <p>
  * Search (BinPacker shares the assignment semantics with {@link com.haulwise.solver.Planner}, D-03):
  * <ul>
@@ -99,7 +99,10 @@ public class TruckRecommendationService {
         Selection selection = validate(request);
         boolean returnToDepot = request.returnToDepot() == null || request.returnToDepot();
         List<ShipmentItem> items = selection.shipments().stream().map(TruckRecommendationService::toItem).toList();
-        List<TruckSpec> fleet = trucks.findAll().stream().map(TruckRecommendationService::toSpec).toList();
+        // Only the depot's own available fleet is a candidate (T-32, T-33): the subset search below is bounded by
+        // this depot's fleet size, never by the size of the whole truck table.
+        List<TruckSpec> fleet = trucks.findByHomeWarehouseIdAndAvailableTrueOrderById(selection.depot().getId())
+                .stream().map(TruckRecommendationService::toSpec).toList();
 
         // Every request has at least one shipment (validated), so an empty fleet always leaves it unassigned
         // ("No trucks are selected.") and is reported as infeasible rather than needing a separate case.
@@ -339,7 +342,7 @@ public class TruckRecommendationService {
                 truck.getDriverCostPlnPerHour());
     }
 
-    /** The validated depot and shipments of a request; every truck in the repository is a candidate. */
+    /** The validated depot and shipments of a request; the depot's available trucks are the candidates. */
     private record Selection(Warehouse depot, List<Shipment> shipments) {
 
         /** The depot and every destination, by id, depot first. */

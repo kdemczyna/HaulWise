@@ -1,5 +1,5 @@
 import { Button, Stack } from "@mantine/core";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { getPlan } from "../api/plans.js";
 import { listTrucks } from "../api/trucks.js";
@@ -8,6 +8,7 @@ import { ErrorState } from "../components/common/ErrorState.jsx";
 import { LoadingState } from "../components/common/LoadingState.jsx";
 import { PageHeader } from "../components/common/PageHeader.jsx";
 import { DeltaBanner } from "../components/plan/DeltaBanner.jsx";
+import { DispatchPlan } from "../components/plan/DispatchPlan.jsx";
 import { PlanComparison } from "../components/plan/PlanComparison.jsx";
 import { PlanIssues } from "../components/plan/PlanIssues.jsx";
 import { RoutesSection } from "../components/plan/RoutesSection.jsx";
@@ -26,6 +27,7 @@ function PlanContent({ id }) {
   const loadPlan = useCallback(() => getPlan(id), [id]);
   const plan = useAsync(loadPlan);
   const trucks = useAsync(listTrucks);
+  const [variant, setVariant] = useState("optimal");
 
   if (plan.error?.status === 404) {
     return (
@@ -55,12 +57,26 @@ function PlanContent({ id }) {
 
   return (
     <Stack gap="lg">
-      <RunSummary plan={plan.data} />
+      <RunSummary
+        plan={plan.data}
+        actions={
+          <DispatchPlan
+            plan={plan.data}
+            variant={variant}
+            onDispatched={() => {
+              plan.reload();
+              trucks.reload();
+            }}
+          />
+        }
+      />
       <DeltaBanner plan={plan.data} />
       <PlanComparison plan={plan.data} />
       <RoutesSection
         plan={plan.data}
         unusedPlates={unusedPlates(plan.data, trucks.data)}
+        variant={variant}
+        onVariantChange={setVariant}
       />
       <PlanIssues plan={plan.data} />
     </Stack>

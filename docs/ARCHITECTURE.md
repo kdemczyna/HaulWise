@@ -80,13 +80,14 @@ HaulWise/
                      DistanceController, PlanController, TruckRecommendationController (T-30),
                      FeatureController, AiController
       service/       WarehouseService, TruckService, ShipmentService, SettingsService,
-                     DistanceService, PlanService, PlanStore, TruckRecommendationService (T-30), AiService
+                     DistanceService, PlanService, PlanStore, TruckRecommendationService (T-30),
+                     PlanDispatchService (T-33), AiService
       repository/    WarehouseRepository, TruckRepository, ShipmentRepository,
                      RouteLegRepository, SettingsRepository
       domain/        Warehouse, Truck, Shipment, RouteLeg, Settings (JPA entities), Priority, LegSource (enums)
       dto/           *Request / *Response records + static from(entity) mappers; plan/ sub-package for plan DTOs;
                      TruckRecommendationRequest/Response, RecommendedTruckResponse (T-30, reuses plan/'s
-                     TotalsResponse and UnassignedResponse)
+                     TotalsResponse and UnassignedResponse); plan/DispatchRequest, DispatchResponse (T-33)
       exception/     NotFoundException, ConflictException, UpstreamException, GlobalExceptionHandler
       integration/   OsrmClient, ClaudeClient
       seed/          SeedDataLoader (ApplicationRunner)
@@ -127,10 +128,11 @@ HaulWise/
       hooks/       useAsync.js, useFeatures.js
       components/
         common/    AppLayout, PageHeader, LoadingState, ErrorState, EmptyState,
-                   ConfirmDeleteModal, PriorityBadge, PinnedTag, ListView, TableBox, RowActions
+                   ConfirmModal (T-33), ConfirmDeleteModal (built on ConfirmModal), PriorityBadge, PinnedTag,
+                   ListView, TableBox, RowActions
         forms/     WarehouseForm, TruckForm, ShipmentForm, SettingsForm (T-31), AiOrderInput
         plan/      PlanForm, PlanComparison, DeltaBanner, RouteCard, StopTimeline,
-                   UtilisationBar, WarningsList, RouteMap, StopList
+                   UtilisationBar, WarningsList, RouteMap, StopList, DispatchPlan (T-33)
       pages/       PlanPage, PlanResultPage, ShipmentsPage, TrucksPage, WarehousesPage,
                    SettingsPage, NotFoundPage
       utils/       format.js (km, PLN, durations via Intl), colors.js (route palette),
@@ -150,6 +152,7 @@ erDiagram
   WAREHOUSE ||--o{ SHIPMENT : "destination"
   WAREHOUSE ||--o{ ROUTE_LEG : "from"
   WAREHOUSE ||--o{ ROUTE_LEG : "to"
+  WAREHOUSE ||--o{ TRUCK : "home depot"
   WAREHOUSE {
     bigint id PK
     varchar name UK
@@ -165,6 +168,8 @@ erDiagram
     double base_consumption_l_per_100km
     double extra_consumption_full_load_l_per_100km
     double driver_cost_pln_per_hour
+    bigint home_warehouse_id FK
+    boolean available
   }
   SHIPMENT {
     bigint id PK
@@ -205,14 +210,14 @@ erDiagram
 | Entity | Fields and constraints |
 |---|---|
 | **Warehouse** | `id` Long identity; `name` 2..60, unique (case-insensitive check in service); `city` 2..60; `lat` -90..90 (Poland ~49..55 not enforced); `lon` -180..180 |
-| **Truck** | `plate` 2..15, unique, uppercase normalised (strip, inner whitespace collapsed to one space, Unicode-aware; spaces are kept, so plates differing only by spaces such as `WX1001A` and `WX 1001A` are different plates - intended); `capacityPallets` 1..40; `payloadKg` 1..40000; `baseConsumptionLPer100Km` (0,100]; `extraConsumptionFullLoadLPer100Km` [0,50]; `driverCostPlnPerHour` [0,1000] |
+| **Truck** | `plate` 2..15, unique, uppercase normalised (strip, inner whitespace collapsed to one space, Unicode-aware; spaces are kept, so plates differing only by spaces such as `WX1001A` and `WX 1001A` are different plates - intended); `capacityPallets` 1..40; `payloadKg` 1..40000; `baseConsumptionLPer100Km` (0,100]; `extraConsumptionFullLoadLPer100Km` [0,50]; `driverCostPlnPerHour` [0,1000]; `homeWarehouse` ManyToOne LAZY, not null (T-32: the depot whose plans and recommendations may use the truck; index `idx_truck_home_warehouse`); `available` boolean, default true (T-33: false = on route after a dispatched plan; excluded from plans and recommendations) |
 | **Shipment** | `reference` 1..40 (e.g. "PO-1042"); `origin`, `destination` ManyToOne LAZY, not null, `origin != destination`; `pallets` 1..100; `weightKg` 1..100000 (above-capacity values are allowed so the solver can report them unassigned); `priority` enum `URGENT|HIGH|NORMAL` default NORMAL; `deadline` `LocalDateTime` nullable (Europe/Warsaw implied, D-10); `pinnedFirst` boolean default false. Index on `origin_id`, `priority` |
 | **RouteLeg** | Directed pair (both directions stored), unique `(from_id, to_id)`; `distanceKm` > 0; `durationMinutes` > 0; `source` `SEEDED|OSRM`. Estimated (haversine) legs are **never stored** (D-06) |
 | **Settings** | Single row, id = 1, created on first access by `SettingsService` (or by the seed) with the section 6.4 defaults. Validated on PUT |
 
 Mapping notes (T-02): entities only carry DB-level constraints (`nullable`, `length`, unique `warehouse.name`, unique `truck.plate`, `route_leg (from_id, to_id)`, check `shipment.origin_id <> destination_id`); range rules live on the request DTOs (section 7). `Truck` normalises its plate (strip, inner whitespace incl. no-break spaces collapsed to one space, upper-case; `Truck.normalisePlate`). `RouteLeg` fields are named `fromWarehouse` / `toWarehouse` (columns `from_id` / `to_id`) because `from`/`to` are JPQL keywords. `Settings.withDefaults()` is the single source of the section 6.4 defaults. Repository queries prepared for T-03/T-05: `WarehouseRepository.existsByNameIgnoreCase[AndIdNot]`, `TruckRepository.existsByPlate[AndIdNot]`, `ShipmentRepository.search(priority?, originId?)` (fetch-joins origin/destination) and `countReferencingWarehouse(id)`, `ShipmentRepository.findWithWarehousesById(id)` (entity graph on origin/destination), `RouteLegRepository.findByFromWarehouseIdAndToWarehouseId` and `deleteByWarehouseId(id)` (flushes first, does not clear the persistence context, so a warehouse edited in the same transaction keeps its changes). With open-in-view off, map `Shipment` to DTOs inside `@Transactional(readOnly = true)` service methods or use `findWithWarehousesById` / `search`.
 
-Deletion rules: deleting a Warehouse referenced by any Shipment -> **409**; otherwise its RouteLegs are deleted first in the same transaction. Updating a Warehouse's lat/lon deletes its stored legs (they would be stale), so it falls back to estimates until an OSRM refresh. Trucks and shipments are freely deletable (plans are snapshots, D-05).
+Deletion rules: deleting a Warehouse referenced by any Shipment, or the home depot of any Truck (T-32: "Warehouse 'POZ West' is the home depot of 2 trucks."), -> **409**; otherwise its RouteLegs are deleted first in the same transaction. Updating a Warehouse's lat/lon deletes its stored legs (they would be stale), so it falls back to estimates until an OSRM refresh. Trucks and shipments are freely deletable (plans are snapshots, D-05).
 
 ### 4.1 Seed data (T-08)
 
@@ -234,11 +239,11 @@ WAW Central - Warsaw 52.2297, 21.0122 | KRK South - Krakow 50.0647, 19.9450 | GD
 | **KTW** | | | | | | | 320/320 | 560/480 |
 | **LUB** | | | | | | | | 700/600 |
 
-**Trucks**: `WX 1001A` 33 pal / 24000 kg / 28 + 10 L / 45 PLN/h; `WX 2002B` 33 / 24000 / 29 + 10 / 45; `WX 3003C` 18 / 12000 / 22 + 7 / 42; `WX 4004D` 10 / 6000 / 18 + 5 / 40; `PO 5005E` 33 / 24000 / 27 + 10 / 45.
+**Trucks** (`seed/trucks.csv` has a `home_warehouse` column naming the depot, T-32; all start available): WAW Central - `WX 1001A` 33 pal / 24000 kg / 28 + 10 L / 45 PLN/h; `WX 2002B` 33 / 24000 / 29 + 10 / 45; `WX 3003C` 18 / 12000 / 22 + 7 / 42; `WX 4004D` 10 / 6000 / 18 + 5 / 40; `PO 5005E` 33 / 24000 / 27 + 10 / 45 (these five unchanged and first, ids 1..5, so the WAW demo is unchanged). POZ West (T-32) - `PO 6006F` 33 / 24000 / 28 + 10 / 45; `PO 7007G` 28 / 18000 / 24 + 8 / 42. POZ's three shipments total 26 pallets / 17 100 kg, so either POZ truck alone carries them all and "Recommend trucks" at POZ has a real choice (one, the other, or both).
 
 **Shipments** (14): 11 from WAW to a spread of cities (mix of 2-16 pallets, 800-11000 kg), including: PO-1041 URGENT to Lublin (deadline tomorrow 20:00), PO-1042 HIGH pinned to Gdansk with a deadline of **tomorrow 12:00** (the shipment the optimal plan misses), PO-1099 with 36 pallets (exceeds every truck -> unassigned demo). 3 from POZ so the depot selector matters.
 
-**WAW demo** (all 11 WAW shipments, all 5 trucks, default request: return to depot, departure tomorrow 06:00; verified by `PlanSeedDemoApiTest` on the loaded seed and `PlannerSeedTest`): trucks WX 1001A, WX 2002B and PO 5005E are used. WX 1001A: OPTIMAL WAW-Lublin-Krakow-Katowice-Gdansk reaches Gdansk at 23:18 -> PO-1042 `deadlineMissed` + `DEADLINE_MISSED`; PRIORITY WAW-Gdansk-Lublin-Krakow-Katowice reaches Gdansk at 10:51 (met) and Lublin at 18:36 (PO-1041 met; OPTIMAL 08:26). Delta +85 km, +75 min, +292.97 PLN: "Delivering Gdansk first costs 292.97 PLN more (85 km and 1 h 15 min longer)." PO-1099 `EXCEEDS_LARGEST_TRUCK`. No other deadline is missed and there are no plan warnings (all legs seeded).
+**WAW demo** (all 11 WAW shipments, all 5 WAW-based trucks, default request: return to depot, departure tomorrow 06:00; verified by `PlanSeedDemoApiTest` on the loaded seed and `PlannerSeedTest`): trucks WX 1001A, WX 2002B and PO 5005E are used. WX 1001A: OPTIMAL WAW-Lublin-Krakow-Katowice-Gdansk reaches Gdansk at 23:18 -> PO-1042 `deadlineMissed` + `DEADLINE_MISSED`; PRIORITY WAW-Gdansk-Lublin-Krakow-Katowice reaches Gdansk at 10:51 (met) and Lublin at 18:36 (PO-1041 met; OPTIMAL 08:26). Delta +85 km, +75 min, +292.97 PLN: "Delivering Gdansk first costs 292.97 PLN more (85 km and 1 h 15 min longer)." PO-1099 `EXCEEDS_LARGEST_TRUCK`. No other deadline is missed and there are no plan warnings (all legs seeded).
 
 ---
 
@@ -282,7 +287,7 @@ Base path `/api`. JSON only. Times are ISO-8601 local date-times (`"2026-11-13T0
 
 `WarehouseRequest {name, city, lat, lon}`; `Warehouse {id, name, city, lat, lon}`.
 
-**Trucks** (US-2) - same five operations on `/api/trucks`. `TruckRequest {plate, capacityPallets, payloadKg, baseConsumptionLPer100Km, extraConsumptionFullLoadLPer100Km, driverCostPlnPerHour}`; `Truck` = request + `id`. 409 on duplicate plate.
+**Trucks** (US-2, US-16, US-17) - same five operations on `/api/trucks`. `TruckRequest {plate, capacityPallets, payloadKg, baseConsumptionLPer100Km, extraConsumptionFullLoadLPer100Km, driverCostPlnPerHour, homeWarehouseId, available?}`; `Truck {id, plate, capacityPallets, payloadKg, baseConsumptionLPer100Km, extraConsumptionFullLoadLPer100Km, driverCostPlnPerHour, homeWarehouse:{id,name,city}, available}`. 409 on duplicate plate. `homeWarehouseId` (T-32) is required (`@NotNull`) and must exist (400 on `homeWarehouseId`: "warehouse 99 does not exist", checked in `TruckService` after Bean Validation). `available` (T-33) is optional: `null` = `true` on create and **unchanged** on update, so an edit that does not send it never clears an on-route status; the manual "on route / available" toggle is the normal full PUT with `available` flipped (the UI reloads the record with GET first). No separate toggle endpoint.
 
 **Shipments** (US-3) - same five operations on `/api/shipments`; `GET /api/shipments?priority=URGENT&originId=1` (both optional filters).
 `ShipmentRequest {reference, originId, destinationId, pallets, weightKg, priority, deadline|null, pinnedFirst}`.
@@ -308,6 +313,7 @@ Implementation notes (T-07): records `SettingsRequest` / `SettingsResponse` (no 
 | POST | `/api/plans` | `PlanRequest` -> `201 Plan`, `Location: /api/plans/{id}` / 400 |
 |---|---|---|
 | GET | `/api/plans/{id}` | `200 Plan` / 404 (also after restart or eviction; any id that is not a stored UUID, incl. a malformed one, is a 404) |
+| POST | `/api/plans/{id}/dispatch` | `DispatchRequest` -> `200 DispatchResponse` / 400 / 404 / 409 (T-33, see "Dispatch" below) |
 
 ```json
 // PlanRequest
@@ -315,7 +321,7 @@ Implementation notes (T-07): records `SettingsRequest` / `SettingsResponse` (no 
   "departureTime": "2026-11-13T06:00:00" }   // optional, default: tomorrow 06:00
 ```
 `returnToDepot` is optional, **default `true`** (D-19; PLAN assumption "default on"; the seed demo numbers assume it). `departureTime` is optional, default tomorrow 06:00 from the injected `Clock` (D-10); same strict local date-time format as `deadline` (OpenAPI: `type: string` with a pattern and example, no `format: date-time`, which would imply an offset). A departure in the past is **accepted** on purpose (re-planning or reviewing an earlier day; the dispatcher sees the times in the result). `GET /api/plans/` without an id falls through to Spring's own 404 (same problem shape and `NOT_FOUND` code, framework wording) - accepted. OpenAPI documents only 200/404 for `GET /api/plans/{id}` (a string path parameter cannot be malformed, so `OpenApiConfig` adds no 400 for it).
-Validation (T-13, all in `PlanService`, reported together in one 400 like shipments): `depotId` required and must exist ("warehouse 99 does not exist"); `shipmentIds` / `truckIds` required, 1..200 ids ("must not be null", "size must be between 1 and 200"), no null ids ("must not contain null ids"), no duplicates ("must not contain duplicate ids: 3"), all exist ("shipment 99 does not exist" / "trucks 98, 99 do not exist"), every shipment's origin == `depotId` ("PO-2001 (id 12) does not start at depot WAW Central"). Ids are validated before `DistanceService.buildMatrix` is called.
+Validation (T-13, all in `PlanService`, reported together in one 400 like shipments): `depotId` required and must exist ("warehouse 99 does not exist"); `shipmentIds` / `truckIds` required, 1..200 ids ("must not be null", "size must be between 1 and 200"), no null ids ("must not contain null ids"), no duplicates ("must not contain duplicate ids: 3"), all exist ("shipment 99 does not exist" / "trucks 98, 99 do not exist"), every shipment's origin == `depotId` ("PO-2001 (id 12) does not start at depot WAW Central"), every truck based at `depotId` (T-32, one `truckIds` error per truck: "Truck WX 1001A is based at WAW Central, not at POZ West.") and available (T-33: "Truck WX 1001A is already on route."). Ids are validated before `DistanceService.buildMatrix` is called.
 
 ```json
 // Plan (response)
@@ -331,7 +337,8 @@ Validation (T-13, all in `PlanService`, reported together in one 400 like shipme
   "unassigned": [ { "shipmentId": 14, "reference": "PO-1099", "reason": "EXCEEDS_LARGEST_TRUCK",
                     "message": "36 pallets exceed the largest selected truck (33 pallets)." } ],
   "warnings": [ { "code": "PIN_CONFLICT", "severity": "WARNING", "message": "...",
-                  "truckId": 1, "shipmentIds": [7, 9] } ]   // shipmentIds: the dropped pins (T-11)
+                  "truckId": 1, "shipmentIds": [7, 9] } ],  // shipmentIds: the dropped pins (T-11)
+  "dispatchedAt": null   // T-33: set (local date-time) once the plan was sent; also returned by GET
   // "suggestions": [ ] is added by T-23 (consolidation); not part of the T-13 response
 }
 
@@ -363,6 +370,18 @@ Plan response rules (T-13):
 - `pinned` (stop) = this stop carries the truck's kept pin-first request (after PIN_CONFLICT resolution); the flag is the same in both variants. Only PRIORITY forces the stop first; OPTIMAL ignores pins, so in OPTIMAL a pinned stop may be at any position (seed demo: Gdansk is stop 4 in OPTIMAL, stop 1 in PRIORITY).
 - `colorIndex` = position of the truck in the plan (same in both variants). `unassigned[].reference` comes from the shipment.
 
+**Dispatch** (T-33, US-17 - Extra; `PlanDispatchService`)
+```json
+// DispatchRequest
+{ "mode": "OPTIMAL" }          // or "PRIORITY": the variant shown on screen; required
+
+// DispatchResponse (200)
+{ "planId": "6f1c...uuid", "mode": "PRIORITY", "dispatchedAt": "2026-11-13T10:15:00",
+  "trucks": [ {"id": 1, "plate": "WX 1001A"}, {"id": 2, "plate": "WX 2002B"} ],       // route order
+  "removedShipments": [ {"id": 2, "reference": "PO-1042"}, {"id": 1, "reference": "PO-1041"} ] }  // route, stop order
+```
+For the chosen variant, every `routes[].truckId` is set `available = false` and every shipment in `routes[].stops[].shipmentIds` is deleted, in one transaction; selected trucks without a route and `unassigned` shipments are untouched. Then the stored plan is replaced by a copy with `dispatchedAt` (`PlanStore.markDispatched`). Both variants share one truck assignment (D-03), so OPTIMAL and PRIORITY always send the same trucks and shipments today; the mode still selects which variant's routes are read. Errors: 404 for an unknown/evicted plan (same as GET); 400 for a missing or unknown `mode`; **409, changing nothing**, when the plan was already sent ("This plan was already sent on 13 Nov 2026, 10:15."), has no routes ("This plan has no routes, so there are no trucks to send."), or is out of date - a routed truck was deleted or is on route, or a routed shipment no longer exists, e.g. another plan of the same shipments was sent first ("This plan is out of date: truck WX 1001A is already on route and 2 of its shipments no longer exist. Plan the run again."). Dispatches are serialised (`synchronized` service method; single instance, D-05), so the same plan cannot be sent twice concurrently. Nothing models messaging drivers; the dispatch is only recorded.
+
 **Recommendations** (T-30, US-14 - Extra)
 | POST | `/api/trucks/recommend` | `TruckRecommendationRequest` -> `200 TruckRecommendationResponse` / 400 |
 |---|---|---|
@@ -377,13 +396,13 @@ Plan response rules (T-13):
   "utilisationPct": 100.0,     // average pallet utilisation across the recommended trucks
   "unassigned": [] }
 
-// TruckRecommendationResponse (infeasible - not even the whole fleet fits everything)
+// TruckRecommendationResponse (infeasible - not even the depot's whole available fleet fits everything)
 { "truckIds": [], "trucks": [], "totals": null, "utilisationPct": null,
   "unassigned": [ { "shipmentId": 14, "reference": "PO-1099", "reason": "EXCEEDS_LARGEST_TRUCK",
                     "message": "36 pallets exceed the largest payload of the selected trucks (24000 kg)." } ] }
 ```
 
-Considers the **whole truck fleet**, not a caller-provided subset (that is what distinguishes it from `POST /api/plans`, which takes `truckIds`). Validation mirrors `PlanService` minus the truck selection (`TruckRecommendationService`, duplicated rather than shared - the two services check different things on a response-shaped-differently selection): `depotId` required and must exist, `shipmentIds` required, 1..200 ids, no nulls, no duplicates, all exist, every shipment's origin == `depotId`. All reported together in one 400, same field-error shapes as `/api/plans`.
+Considers the depot's **whole available fleet** - every truck based at `depotId` (T-32) with `available = true` (T-33), read with `TruckRepository.findByHomeWarehouseIdAndAvailableTrueOrderById`, never the whole table - not a caller-provided subset (that is what distinguishes it from `POST /api/plans`, which takes `truckIds`). The subset search below is therefore bounded by that depot's own fleet size: trucks added at other depots neither appear in the result nor push a small depot over the search cap (`TruckRecommendationDepotScopeApiTest`). A depot without available trucks is reported like any infeasible request (every shipment unassigned, "No trucks are selected."). Validation mirrors `PlanService` minus the truck selection (`TruckRecommendationService`, duplicated rather than shared - the two services check different things on a response-shaped-differently selection): `depotId` required and must exist, `shipmentIds` required, 1..200 ids, no nulls, no duplicates, all exist, every shipment's origin == `depotId`. All reported together in one 400, same field-error shapes as `/api/plans`.
 
 Search (`haulwise.solver.max-recommendation-trucks`, default 7, validated 0..12 at startup like `max-brute-force-stops` - 12, the limit, measured ~21s per request with max-brute-force-stops-sized routes, so the default is kept well below it): every non-empty subset of the fleet is tried when the fleet has at most this many trucks (up to 127 subsets at the default), smallest subset size first; a subset is feasible when `BinPacker` leaves nothing unassigned. Cost per feasible subset = sum over its trucks of `StopSequencer` (OPTIMAL / `RouteObjective.COST`) route cost. The cheapest feasible subset wins, even when it uses more trucks than another feasible subset (costs compared at `StopSequencer.SCORE_RESOLUTION`, the same 1e-6 tie resolution as route scores); only equal costs are broken by fewer trucks, then the lowest truck ids. Above the cap, exhaustive search is skipped (documented limitation, not a bug): the fleet is packed whole (biggest-first, as `BinPacker` already does), then any truck whose shipments the *remaining used trucks* can absorb without creating unassigned ones is greedily dropped - this does not reconsider trucks that got no shipments in the first pass, so the result is not guaranteed optimal above the cap. If no subset - not even the whole fleet - can carry every shipment, the response is `200` with `unassigned` naming what does not fit and why (same reasons as a Plan's `unassigned`), not a 500.
 
@@ -504,8 +523,9 @@ OSRM (optional, T-26): `POST /api/distances/refresh` calls `GET {osrmBaseUrl}/ta
 - **API client** (`api/client.js`): `request(method, path, body)` on `fetch`, base URL from `import.meta.env.VITE_API_BASE_URL`; on non-2xx parses problem+json into `ApiError {status, code, title, detail, fieldErrors: {field: message}}`; network failure -> `ApiError {code: 'NETWORK'}` with message "Cannot reach the HaulWise server. Is the backend running on :8080?". Resource modules export plain functions (`listShipments(filters)`, `createPlan(req)`, ...).
 - **State**: no global store. Page-level state + a small `useAsync(fn)` hook (`{data, error, loading, reload}`; `fn` is wrapped in `useCallback` by the caller with the values it reads, e.g. filters, as dependencies - T-14 changed this from `useAsync(fn, deps)` so oxlint's `exhaustive-deps` checks the dependencies). Features fetched once in `useFeatures` (context). Plan result is re-fetchable by URL via `GET /api/plans/{id}`; if 404 (restart), show "This plan expired - plan again" with a link.
 - **CRUD pages**: Mantine `Table` + `Modal` forms (create/edit share one form component), `ConfirmDeleteModal`, notifications on success, 409 shown with the server `detail` inside the open dialog (form-level `Alert` in the form modal, `Alert` in `ConfirmDeleteModal` for "warehouse in use"; T-15 - the dialog stays open so the user can fix or cancel). Shipments: `SegmentedControl`/chips filter by priority, `PriorityBadge` colours (URGENT red, HIGH orange, NORMAL gray). Deadline input: `TextInput type="datetime-local"` (avoids `@mantine/dates` + dayjs, D-11).
-- **Plan page**: depot `Select` -> shipments list filtered to that origin (checkboxes, all preselected), trucks (checkboxes), return-to-depot `Switch`, departure time; submit -> navigate to `/plans/:id`.
-- **Result page**: `DeltaBanner` (headline sentence, green "no extra cost" variant) -> `PlanComparison` (two columns: totals table optimal vs priority with delta column) -> `RouteMap` -> per-truck `RouteCard` (colour chip, `UtilisationBar` pallets + kg, `StopTimeline` with Mantine `Timeline`, arrival times, deadline/priority badges) -> `WarningsList` + unassigned list. Toggle which variant the map/cards display.
+- **Plan page**: depot `Select` -> shipments list filtered to that origin (checkboxes, all preselected), trucks (checkboxes) filtered to the available trucks based at that depot (T-32/T-33; client-side filter of the one truck list, reset to "all preselected" when the depot changes; empty state "No available trucks at this depot" naming how many are on route), return-to-depot `Switch`, departure time; submit -> navigate to `/plans/:id`.
+- **Result page**: `DeltaBanner` (headline sentence, green "no extra cost" variant) -> `PlanComparison` (two columns: totals table optimal vs priority with delta column) -> `RouteMap` -> per-truck `RouteCard` (colour chip, `UtilisationBar` pallets + kg, `StopTimeline` with Mantine `Timeline`, arrival times, deadline/priority badges) -> `WarningsList` + unassigned list. Toggle which variant the map/cards display; the toggle state lives in `PlanResultPage`, so "Send trucks" (T-33, `DispatchPlan` next to "Edit run" / "Plan again") sends the variant on screen after a `ConfirmModal` naming the shipment count and truck plates. After sending (and whenever the reopened plan has `dispatchedAt`) the button is replaced by a "Sent 13 Nov, 10:15" badge.
+- **Trucks page** (T-32/T-33): columns add "Home depot" and "Status" (Available / On route badge with a "Mark on route" / "Mark available" button that reloads the truck and PUTs it with `available` flipped, `setTruckAvailable` in `api/trucks.js`); `TruckForm` has a required "Home depot" select and never sends `available`.
 - **Map** (`RouteMap`): `MapContainer` fitted to bounds; numbered markers via `L.divIcon` (avoids the known Leaflet default-icon bundling issue); straight `Polyline` per truck in its colour (no road geometry - D-08). Offline: listen to `tileerror`; after the first error show an inline `Alert` "Map tiles unavailable (offline). Stops and timeline below are complete." Markers and lines still render on a blank background. Import `leaflet/dist/leaflet.css` once.
 - **States**: every data view uses `LoadingState` (skeleton), `ErrorState` (message + Retry), `EmptyState` (call to action, e.g. "No trucks yet - add your first truck").
 - **Styling**: Mantine theme in `theme.js` (primary colour, radius, font) = design tokens; `global.css` minimal. Formatting via `Intl.NumberFormat('en-GB', {style:'currency', currency:'PLN'})`.
@@ -635,5 +655,7 @@ Order unchanged except: **T-07 (Settings) before T-06 wiring** is fine since T-0
 | T-27 | Client-side KPIs from `Plan` (fill rate, cost per pallet, empty km = return leg km) |
 | T-28 | `POST /api/plans/{id}/replan` reusing `Planner`; diff per truck |
 | T-29 | Run section 10 from a clean clone with network off and no `.env` |
-| T-30 | `TruckRecommendationController`/`Service` (own classes, `com.haulwise.controller`/`service`), `POST /api/trucks/recommend` (section 5.3, "Recommendations"). Search considers the whole fleet, not a caller-provided `truckIds`; validation mirrors `PlanService.validate` minus truck selection, duplicated rather than extracted (different selection shape, no shared superclass worth the coupling). `haulwise.solver.max-recommendation-trucks` (default 10, 0..12) caps exhaustive subset search; above it, a greedy drop fallback (documented limitation). Frontend: "Recommend trucks" button on `PlanForm`, ticks `truckIds` and shows an inline note; errors shown like other form errors |
+| T-30 | `TruckRecommendationController`/`Service` (own classes, `com.haulwise.controller`/`service`), `POST /api/trucks/recommend` (section 5.3, "Recommendations"). Search considers the whole fleet (since T-32/T-33: the depot's available fleet), not a caller-provided `truckIds`; validation mirrors `PlanService.validate` minus truck selection, duplicated rather than extracted (different selection shape, no shared superclass worth the coupling). `haulwise.solver.max-recommendation-trucks` (default 7, 0..12 - 12 measured ~21s/request, see section 5.3 "Recommendations") caps exhaustive subset search; above it, a greedy drop fallback (documented limitation). Frontend: "Recommend trucks" button on `PlanForm`, ticks `truckIds` and shows an inline note; errors shown like other form errors |
 | T-31 | `SettingsForm` (new, replaces the `SettingsPage` placeholder): a full `@mantine/form` form for all 10 `SettingsRequest` fields, client ranges mirroring the backend exactly (including the two cross-field rules, for fast feedback - the server stays authoritative). `SettingsPage` loads with `useAsync(getSettings)` (loading/error/retry via the common components, no list involved) and saves via the existing `PUT /api/settings` (unchanged backend) |
+| T-32 | **Done.** `Truck.homeWarehouse` (`@ManyToOne(LAZY, optional = false)`, column `home_warehouse_id`, indexed, like `Shipment.origin`); `TruckRequest.homeWarehouseId` (`@NotNull`, existence checked in `TruckService` -> 400 on the field) and `TruckResponse.homeWarehouse` (`WarehouseSummary`); truck reads use `@EntityGraph` queries (`findWithHomeWarehouse...`). `PlanService.validate` adds one `truckIds` error per truck based elsewhere. `TruckRecommendationService` reads its candidates with `findByHomeWarehouseIdAndAvailableTrueOrderById(depotId)`, so the subset search is bounded by the depot's own fleet (`TruckRecommendationDepotScopeApiTest`: cap 3, 3 trucks at A, 10 cheaper/bigger at B -> exhaustive search on A's 3, A's cheapest pair returned, no B truck). Deleting a warehouse that is a home depot -> 409. Seed: `trucks.csv` gains `home_warehouse`; the 5 original trucks stay WAW Central, first and unchanged; `PO 6006F` and `PO 7007G` added at POZ West (section 4.1). `PlanSeedDemoApiTest` now selects the WAW-based trucks (`findByHomeWarehouseIdAndAvailableTrueOrderById`) instead of `findAll()`, because the API now rejects the POZ trucks; its assertions are unchanged. Frontend: home depot select in `TruckForm`, "Home depot" column, `PlanForm` lists only the selected depot's available trucks |
+| T-33 | **Done.** `Truck.available` (default true; `TruckRequest.available` optional, null = keep). `PlanService.validate` rejects on-route trucks ("Truck X is already on route."), recommendations skip them. `POST /api/plans/{id}/dispatch` (section 5.3 "Dispatch"): `PlanDispatchService` (synchronized; checks, then one transaction marking routed trucks unavailable and deleting routed shipments; then `PlanStore.markDispatched`, which replaces the stored snapshot with `withDispatchedAt(now)`). `PlanResponse.dispatchedAt` (null until sent) is returned by POST and GET. 409 for already sent / no routes / out of date. Tests: `PlanDispatchApiTest` (routed vs unused trucks, unassigned shipment kept, second dispatch 409 with nothing changed, chosen variant via a hand-built stored plan because the planner's variants share trucks (D-03), stale plan 409, 404, 400 on mode, creation rejects on-route trucks) and `FleetOpsSeedApiTest` (WAW demo sent on the loaded seed: 3 trucks on route, 10 shipments removed, PO-1099 and POZ untouched, a new WAW plan with all WAW trucks is rejected naming the 3). Frontend: `DispatchPlan` + generic `ConfirmModal`, availability toggle on the Trucks page |

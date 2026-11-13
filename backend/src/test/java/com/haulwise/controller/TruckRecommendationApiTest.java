@@ -81,10 +81,10 @@ class TruckRecommendationApiTest {
      */
     @Test
     void exactFitRecommendationPicksTheSingleMatchingTruckOverTwoSmallerTrucks() throws Exception {
-        Truck big = trucks.save(new Truck("WX 3003C", 35, 24000, 28, 10, 45));
+        Truck big = trucks.save(new Truck("WX 3003C", 35, 24000, 28, 10, 45, depot));
         // Together these two also fit everything, but two trips with equal running costs cost more.
-        trucks.save(new Truck("WX 1001A", 20, 24000, 28, 10, 45));
-        trucks.save(new Truck("WX 2002B", 15, 24000, 28, 10, 45));
+        trucks.save(new Truck("WX 1001A", 20, 24000, 28, 10, 45, depot));
+        trucks.save(new Truck("WX 2002B", 15, 24000, 28, 10, 45, depot));
         List<Shipment> load = List.of(
                 shipment("PO-1", 20, 2000),
                 shipment("PO-2", 10, 1000),
@@ -108,9 +108,9 @@ class TruckRecommendationApiTest {
      */
     @Test
     void cheaperTwoTruckCombinationBeatsAMoreExpensiveSingleTruck() throws Exception {
-        trucks.save(new Truck("WX 3003C", 35, 24000, 40, 15, 120));
-        Truck smallA = trucks.save(new Truck("WX 1001A", 20, 24000, 15, 3, 20));
-        Truck smallB = trucks.save(new Truck("WX 2002B", 15, 24000, 15, 3, 20));
+        trucks.save(new Truck("WX 3003C", 35, 24000, 40, 15, 120, depot));
+        Truck smallA = trucks.save(new Truck("WX 1001A", 20, 24000, 15, 3, 20, depot));
+        Truck smallB = trucks.save(new Truck("WX 2002B", 15, 24000, 15, 3, 20, depot));
         List<Shipment> load = List.of(
                 shipment("PO-1", 20, 2000),
                 shipment("PO-2", 10, 1000),
@@ -128,8 +128,8 @@ class TruckRecommendationApiTest {
     /** No single truck can take 40 pallets; the cheapest 2-truck combination is recommended. */
     @Test
     void twoTrucksAreRecommendedWhenNoSingleTruckFitsEverything() throws Exception {
-        trucks.save(new Truck("WX 1001A", 25, 24000, 28, 10, 45));
-        trucks.save(new Truck("WX 2002B", 20, 24000, 28, 10, 45));
+        trucks.save(new Truck("WX 1001A", 25, 24000, 28, 10, 45, depot));
+        trucks.save(new Truck("WX 2002B", 20, 24000, 28, 10, 45, depot));
         List<Shipment> load = List.of(
                 shipment("PO-1", 25, 2000),
                 shipment("PO-2", 15, 1500));
@@ -145,7 +145,7 @@ class TruckRecommendationApiTest {
     /** Heavier than the largest truck's payload: reported as unassigned, not a 500. */
     @Test
     void shipmentThatFitsNoTruckIsReportedAsInfeasibleNotA500() throws Exception {
-        trucks.save(new Truck("WX 1001A", 33, 6000, 28, 10, 45));
+        trucks.save(new Truck("WX 1001A", 33, 6000, 28, 10, 45, depot));
         Shipment tooHeavy = shipment("PO-99", 5, 30000);
 
         recommend(request(depot.getId(), List.of(tooHeavy.getId()), true))
@@ -198,7 +198,7 @@ class TruckRecommendationApiTest {
 
     @Test
     void shipmentFromAnotherDepotReturns400NamingIt() throws Exception {
-        trucks.save(new Truck("WX 1001A", 33, 24000, 28, 10, 45));
+        trucks.save(new Truck("WX 1001A", 33, 24000, 28, 10, 45, depot));
         Shipment fromElsewhere = shipments.save(new Shipment("PO-9", bstadt, depot, 4, 1000));
 
         recommend(request(depot.getId(), List.of(fromElsewhere.getId()), true))
@@ -207,6 +207,36 @@ class TruckRecommendationApiTest {
                 .andExpect(jsonPath("$.errors[0].field").value("shipmentIds"))
                 .andExpect(jsonPath("$.errors[0].message")
                         .value("PO-9 (id " + fromElsewhere.getId() + ") does not start at depot Depot A"));
+    }
+
+    /**
+     * T-32 + T-33: a much cheaper truck based at another depot and a cheaper truck on route at this depot are
+     * never recommended; only this depot's available truck is.
+     */
+    @Test
+    void onlyAvailableTrucksBasedAtTheDepotAreCandidates() throws Exception {
+        Truck own = trucks.save(new Truck("WX 1001A", 33, 24000, 40, 15, 120, depot));
+        trucks.save(new Truck("PO 6006F", 33, 24000, 10, 1, 5, bstadt));
+        Truck onRoute = new Truck("WX 2002B", 33, 24000, 10, 1, 5, depot);
+        onRoute.setAvailable(false);
+        trucks.save(onRoute);
+        Shipment shipment = shipment("PO-1", 10, 1000);
+
+        recommend(request(depot.getId(), List.of(shipment.getId()), true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.truckIds", contains(own.getId().intValue())))
+                .andExpect(jsonPath("$.trucks[*].plate", contains("WX 1001A")));
+    }
+
+    @Test
+    void depotWithoutAvailableTrucksIsInfeasibleEvenWhenOtherDepotsHaveSome() throws Exception {
+        trucks.save(new Truck("PO 6006F", 33, 24000, 28, 10, 45, bstadt));
+        Shipment shipment = shipment("PO-1", 10, 1000);
+
+        recommend(request(depot.getId(), List.of(shipment.getId()), true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.truckIds", hasSize(0)))
+                .andExpect(jsonPath("$.unassigned[0].shipmentId").value(shipment.getId()));
     }
 
     /**
@@ -249,8 +279,8 @@ class TruckRecommendationApiTest {
             Warehouse bstadt = warehouses.save(new Warehouse("B Hub", "Bstadt", 51.0, 20.0));
             routeLegs.save(new RouteLeg(depot, bstadt, 100, 90, LegSource.SEEDED, LocalDateTime.now()));
             routeLegs.save(new RouteLeg(bstadt, depot, 100, 90, LegSource.SEEDED, LocalDateTime.now()));
-            Truck big = trucks.save(new Truck("WX 3003C", 35, 24000, 28, 10, 45));
-            trucks.save(new Truck("WX 1001A", 20, 24000, 28, 10, 45));
+            Truck big = trucks.save(new Truck("WX 3003C", 35, 24000, 28, 10, 45, depot));
+            trucks.save(new Truck("WX 1001A", 20, 24000, 28, 10, 45, depot));
             Shipment shipment = new Shipment("PO-1", depot, bstadt, 20, 2000);
             shipment.setPriority(Priority.NORMAL);
             shipment = shipments.save(shipment);

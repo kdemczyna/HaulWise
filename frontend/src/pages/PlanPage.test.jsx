@@ -37,9 +37,23 @@ const SHIPMENTS = [
   shipment(4, "PO-1044"),
 ];
 
+function truck(id, plate, fields = {}) {
+  return {
+    id,
+    plate,
+    capacityPallets: 33,
+    payloadKg: 24000,
+    homeWarehouse: WAW,
+    available: true,
+    ...fields,
+  };
+}
+
 const TRUCKS = [
-  { id: 1, plate: "WX 1001A", capacityPallets: 33, payloadKg: 24000 },
-  { id: 2, plate: "WX 2002B", capacityPallets: 33, payloadKg: 24000 },
+  truck(1, "WX 1001A"),
+  truck(2, "WX 2002B"),
+  truck(5, "PO 6006F", { homeWarehouse: GDN }),
+  truck(7, "WX 3003C", { available: false }),
 ];
 
 beforeEach(() => {
@@ -280,6 +294,69 @@ describe("PlanPage", () => {
 
     expect(
       await screen.findByText("Cannot reach the server."),
+    ).toBeInTheDocument();
+  });
+
+  it("lists only the available trucks based at the chosen depot", async () => {
+    const { user } = renderPage();
+    await chooseDepot(user);
+    const trucks = within(screen.getByRole("region", { name: "Trucks" }));
+
+    expect(trucks.getAllByRole("checkbox").map((box) => box.value)).toEqual([
+      "1",
+      "2",
+    ]);
+    expect(trucks.getByText("2 of 2 selected")).toBeInTheDocument();
+    expect(
+      trucks.queryByRole("checkbox", { name: /PO 6006F/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      trucks.queryByRole("checkbox", { name: /WX 3003C/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("switches the truck list with the depot and says when it is empty", async () => {
+    listShipments.mockImplementation(({ originId }) =>
+      Promise.resolve(
+        originId === 3 ? [shipment(9, "PO-2001", { origin: GDN })] : SHIPMENTS,
+      ),
+    );
+    listTrucks.mockResolvedValue([
+      ...TRUCKS,
+      truck(8, "PO 7007G", { homeWarehouse: GDN, available: false }),
+    ]);
+    const { user } = renderPage();
+    const trucks = () => within(screen.getByRole("region", { name: "Trucks" }));
+
+    expect(
+      await screen.findByText("Choose a depot to see its trucks."),
+    ).toBeInTheDocument();
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /Depot/ }),
+      "GDN Port (Gdansk)",
+    );
+    expect(
+      await trucks().findByRole("checkbox", { name: /PO 6006F/ }),
+    ).toBeChecked();
+    expect(trucks().getAllByRole("checkbox")).toHaveLength(1);
+  });
+
+  it("explains an empty truck list when every truck of the depot is on route", async () => {
+    listTrucks.mockResolvedValue([
+      truck(1, "WX 1001A", { available: false }),
+      truck(5, "PO 6006F", { homeWarehouse: GDN }),
+    ]);
+    const { user } = renderPage();
+    await chooseDepot(user);
+
+    expect(
+      screen.getByRole("heading", {
+        name: "No available trucks at this depot",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The only truck based at this depot is on route/),
     ).toBeInTheDocument();
   });
 });

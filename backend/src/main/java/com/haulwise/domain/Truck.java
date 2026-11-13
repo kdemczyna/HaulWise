@@ -2,17 +2,23 @@ package com.haulwise.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.Locale;
 
 /**
- * A truck of the fleet with its capacity and fuel/driver cost parameters.
+ * A truck of the fleet with its capacity and fuel/driver cost parameters, its home depot (T-32: a plan or a
+ * recommendation only uses trucks based at its depot) and whether it is available (T-33: {@code false} while it
+ * is on route after a dispatched plan).
  */
 @Entity
-@Table(name = "truck")
+@Table(name = "truck", indexes = @Index(name = "idx_truck_home_warehouse", columnList = "home_warehouse_id"))
 public class Truck {
 
     @Id
@@ -38,17 +44,25 @@ public class Truck {
     @Column(nullable = false)
     private double driverCostPlnPerHour;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "home_warehouse_id", nullable = false)
+    private Warehouse homeWarehouse;
+
+    @Column(nullable = false)
+    private boolean available = true;
+
     protected Truck() {
     }
 
     public Truck(String plate, int capacityPallets, int payloadKg, double baseConsumptionLPer100Km,
-                 double extraConsumptionFullLoadLPer100Km, double driverCostPlnPerHour) {
+                 double extraConsumptionFullLoadLPer100Km, double driverCostPlnPerHour, Warehouse homeWarehouse) {
         setPlate(plate);
         this.capacityPallets = capacityPallets;
         this.payloadKg = payloadKg;
         this.baseConsumptionLPer100Km = baseConsumptionLPer100Km;
         this.extraConsumptionFullLoadLPer100Km = extraConsumptionFullLoadLPer100Km;
         this.driverCostPlnPerHour = driverCostPlnPerHour;
+        this.homeWarehouse = homeWarehouse;
     }
 
     /**
@@ -109,5 +123,21 @@ public class Truck {
 
     public void setDriverCostPlnPerHour(double driverCostPlnPerHour) {
         this.driverCostPlnPerHour = driverCostPlnPerHour;
+    }
+
+    public Warehouse getHomeWarehouse() {
+        return homeWarehouse;
+    }
+
+    public void setHomeWarehouse(Warehouse homeWarehouse) {
+        this.homeWarehouse = homeWarehouse;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
     }
 }

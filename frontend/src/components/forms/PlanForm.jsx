@@ -63,6 +63,22 @@ function selectedIds(selection, items) {
     : selection.filter((id) => listed.includes(id));
 }
 
+/**
+ * The trucks a run from `depotId` can use (T-32, T-33): based at the depot and not on route.
+ * Keeps the useAsync shape so the checklist shows the same loading and error states.
+ */
+function depotTrucks(trucks, depotId) {
+  const all = trucks.data ?? [];
+  const atDepot = depotId
+    ? all.filter((truck) => String(truck.homeWarehouse.id) === depotId)
+    : [];
+  return {
+    ...trucks,
+    data: trucks.data && atDepot.filter((truck) => truck.available),
+    onRoute: atDepot.filter((truck) => !truck.available).length,
+  };
+}
+
 function toRequest(values, shipments, trucks) {
   return {
     depotId: Number(values.depotId),
@@ -114,6 +130,7 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
     [depotId],
   );
   const shipments = useAsync(loadShipments);
+  const availableTrucks = depotTrucks(trucks, depotId);
   const [recommendation, setRecommendation] = useState({
     loading: false,
     note: null,
@@ -163,7 +180,7 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
 
   const handleSubmit = form.onSubmit(async (values) => {
     setFormError(null);
-    const request = toRequest(values, shipments.data, trucks.data);
+    const request = toRequest(values, shipments.data, availableTrucks.data);
     const errors = selectionErrors(request);
     if (errors) {
       form.setErrors(errors);
@@ -181,6 +198,8 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
     form.setFieldValue("depotId", event.currentTarget.value);
     form.setFieldValue("shipmentIds", null);
     form.clearFieldError("shipmentIds");
+    form.setFieldValue("truckIds", null);
+    form.clearFieldError("truckIds");
   };
 
   const depotOptions = [
@@ -270,18 +289,13 @@ export function PlanForm({ warehouses, trucks, initialRequest }) {
           title="Trucks"
           field="truckIds"
           form={form}
-          result={trucks}
+          result={availableTrucks}
           label="trucks"
           renderLabel={truckLabel}
           empty={
-            <EmptyState
-              title="No trucks yet"
-              message="Add a truck before planning a run."
-              action={
-                <Button component={Link} to="/trucks" variant="default">
-                  Go to Trucks
-                </Button>
-              }
+            <NoDepotTrucks
+              depotId={depotId}
+              onRoute={availableTrucks.onRoute}
             />
           }
         />
@@ -374,6 +388,27 @@ function SelectionSection({
   );
 }
 
+/** Empty truck checklist: no depot chosen yet, or no available truck based there. */
+function NoDepotTrucks({ depotId, onRoute }) {
+  if (!depotId) {
+    return <Text c="dimmed">Choose a depot to see its trucks.</Text>;
+  }
+  const message =
+    onRoute > 0
+      ? `${onRoute === 1 ? "The only truck" : `All ${onRoute} trucks`} based at this depot ${onRoute === 1 ? "is" : "are"} on route. Mark a truck available on the Trucks page.`
+      : "Only trucks based at the chosen depot can be used. Add a truck here or move one on the Trucks page.";
+  return (
+    <EmptyState
+      title="No available trucks at this depot"
+      message={message}
+      action={
+        <Button component={Link} to="/trucks" variant="default">
+          Go to Trucks
+        </Button>
+      }
+    />
+  );
+}
 function shipmentLabel(shipment) {
   const deadline = shipment.deadline
     ? `, due ${formatDeadline(shipment.deadline)}`

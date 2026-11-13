@@ -7,6 +7,7 @@ import com.haulwise.exception.ConflictException;
 import com.haulwise.exception.NotFoundException;
 import com.haulwise.repository.RouteLegRepository;
 import com.haulwise.repository.ShipmentRepository;
+import com.haulwise.repository.TruckRepository;
 import com.haulwise.repository.WarehouseRepository;
 import java.util.List;
 import org.springframework.data.domain.Sort;
@@ -25,12 +26,14 @@ public class WarehouseService {
     private final WarehouseRepository warehouses;
     private final ShipmentRepository shipments;
     private final RouteLegRepository routeLegs;
+    private final TruckRepository trucks;
 
     public WarehouseService(WarehouseRepository warehouses, ShipmentRepository shipments,
-                            RouteLegRepository routeLegs) {
+                            RouteLegRepository routeLegs, TruckRepository trucks) {
         this.warehouses = warehouses;
         this.shipments = shipments;
         this.routeLegs = routeLegs;
+        this.trucks = trucks;
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +76,11 @@ public class WarehouseService {
         if (usages > 0) {
             throw new ConflictException("Warehouse '%s' is used by %d %s.".formatted(
                     warehouse.getName(), usages, usages == 1 ? "shipment" : "shipments"));
+        }
+        long homedTrucks = trucks.countByHomeWarehouseId(id);
+        if (homedTrucks > 0) {
+            throw new ConflictException("Warehouse '%s' is the home depot of %d %s.".formatted(
+                    warehouse.getName(), homedTrucks, homedTrucks == 1 ? "truck" : "trucks"));
         }
         routeLegs.deleteByWarehouseId(id);
         warehouses.delete(warehouse);

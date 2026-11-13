@@ -17,6 +17,7 @@ import com.haulwise.HaulWiseApiTest;
 import com.haulwise.domain.LegSource;
 import com.haulwise.domain.RouteLeg;
 import com.haulwise.domain.Shipment;
+import com.haulwise.domain.Truck;
 import com.haulwise.domain.Warehouse;
 import com.haulwise.repository.RouteLegRepository;
 import com.haulwise.repository.ShipmentRepository;
@@ -290,6 +291,18 @@ class WarehouseApiTest {
 
         assertThat(warehouses.existsById(gdn.getId())).isTrue();
         assertThat(routeLegs.count()).isEqualTo(2);
+    }
+
+    @Test
+    void deleteHomeDepotOfATruckReturns409AndKeepsIt() throws Exception {
+        Warehouse poz = save("POZ West", "Poznan");
+        trucks.save(new Truck("PO 6006F", 33, 24000, 28.0, 10.0, 45.0, poz));
+
+        mvc.perform(delete("/api/warehouses/{id}", poz.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Warehouse 'POZ West' is the home depot of 1 truck."));
+
+        assertThat(warehouses.existsById(poz.getId())).isTrue();
     }
 
     @Test

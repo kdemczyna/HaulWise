@@ -9,8 +9,11 @@ function plural(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-/** Depot, departure and counts of the run, with "Edit run" (prefilled form) and "Plan again" (same request). */
-export function RunSummary({ plan }) {
+/**
+ * Depot, departure and counts of the run, with "Edit run" (prefilled form), "Plan again" (same
+ * request) and `actions` (e.g. "Send trucks") next to them.
+ */
+export function RunSummary({ plan, actions }) {
   const navigate = useNavigate();
   const [replanning, setReplanning] = useState(false);
   const [error, setError] = useState(null);
@@ -43,6 +46,7 @@ export function RunSummary({ plan }) {
             {request.returnToDepot ? "return to depot" : "no return to depot"}
           </Text>
           <Group gap="sm">
+            {actions}
             <Button
               component={Link}
               to="/"

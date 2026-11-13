@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { Route, Routes } from "react-router";
 import { ApiError } from "../api/client.js";
-import { createPlan, getPlan } from "../api/plans.js";
+import { createPlan, dispatchPlan, getPlan } from "../api/plans.js";
 import { DEMO_PLAN } from "../test/fixtures/plan.js";
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { PlanResultPage } from "./PlanResultPage.jsx";
@@ -230,6 +230,93 @@ describe("PlanResultPage", () => {
     expect(screen.getByRole("link", { name: "Plan a run" })).toHaveAttribute(
       "href",
       "/",
+    );
+  });
+
+  it("sends the trucks of the variant on screen after confirmation", async () => {
+    dispatchPlan.mockResolvedValue({
+      planId: DEMO_PLAN.id,
+      mode: "PRIORITY",
+      dispatchedAt: "2026-11-13T10:15:00",
+      trucks: [
+        { id: 1, plate: "WX 1001A" },
+        { id: 2, plate: "WX 2002B" },
+      ],
+      removedShipments: [{ id: 2, reference: "PO-1042" }],
+    });
+    // Only the priority routes carry shipment ids, so the counts prove which variant is sent.
+    const plan = {
+      ...DEMO_PLAN,
+      priority: {
+        ...DEMO_PLAN.priority,
+        routes: DEMO_PLAN.priority.routes.map((route, i) => ({
+          ...route,
+          stops: route.stops.map((stop, j) => ({
+            ...stop,
+            shipmentIds: [10 * i + j + 1],
+          })),
+        })),
+      },
+    };
+    const { user } = renderPage(plan);
+    await user.click(await screen.findByRole("radio", { name: "Priority" }));
+    await user.click(screen.getByRole("button", { name: "Send trucks" }));
+
+    const confirm = within(
+      screen.getByRole("dialog", { name: "Send the priority plan?" }),
+    );
+    expect(
+      confirm.getByText(
+        /This removes 4 shipments from the shipment list and marks 2 trucks as on route/,
+      ),
+    ).toBeInTheDocument();
+    expect(confirm.getByText("WX 2002B")).toBeInTheDocument();
+    expect(confirm.getByRole("button", { name: "Cancel" })).toHaveFocus();
+
+    getPlan.mockResolvedValue({ ...plan, dispatchedAt: "2026-11-13T10:15:00" });
+    await user.click(confirm.getByRole("button", { name: "Send trucks" }));
+
+    expect(dispatchPlan).toHaveBeenCalledWith(DEMO_PLAN.id, "PRIORITY");
+    expect(
+      await screen.findByText(
+        "Sent 2 trucks; 1 shipment removed from the list",
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Sent 13 Nov, 10:15")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Send trucks" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows when a reopened plan was already sent instead of the button", async () => {
+    renderPage({ ...DEMO_PLAN, dispatchedAt: "2026-11-13T10:15:00" });
+
+    expect(await screen.findByText("Sent 13 Nov, 10:15")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Send trucks" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the confirmation open with the server message when sending fails", async () => {
+    dispatchPlan.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: "CONFLICT",
+        detail: "This plan was already sent on 13 Nov 2026, 10:15.",
+      }),
+    );
+    const { user } = renderPage();
+    await user.click(
+      await screen.findByRole("button", { name: "Send trucks" }),
+    );
+    const confirm = within(
+      screen.getByRole("dialog", { name: "Send the optimal plan?" }),
+    );
+    await user.click(confirm.getByRole("button", { name: "Send trucks" }));
+
+    expect(dispatchPlan).toHaveBeenCalledWith(DEMO_PLAN.id, "OPTIMAL");
+    expect(await confirm.findByRole("alert")).toHaveTextContent(
+      "This plan was already sent on 13 Nov 2026, 10:15.",
     );
   });
 });

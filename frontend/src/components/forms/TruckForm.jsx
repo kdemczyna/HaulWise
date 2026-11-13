@@ -1,7 +1,17 @@
-import { NumberInput, SimpleGrid, Stack, TextInput } from "@mantine/core";
+import {
+  NativeSelect,
+  NumberInput,
+  SimpleGrid,
+  Stack,
+  TextInput,
+} from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useFormSubmit } from "../../hooks/useFormSubmit.js";
-import { numberRange, textLength } from "../../utils/validation.js";
+import {
+  numberRange,
+  requiredChoice,
+  textLength,
+} from "../../utils/validation.js";
 import { FormFooter } from "./FormFooter.jsx";
 
 const NUMBER_FIELDS = [
@@ -13,7 +23,10 @@ const NUMBER_FIELDS = [
 ];
 
 function toFormValues(truck) {
-  const values = { plate: truck?.plate ?? "" };
+  const values = {
+    plate: truck?.plate ?? "",
+    homeWarehouseId: String(truck?.homeWarehouse?.id ?? ""),
+  };
   for (const field of NUMBER_FIELDS) {
     values[field] = truck?.[field] ?? "";
   }
@@ -21,19 +34,27 @@ function toFormValues(truck) {
 }
 
 function toRequest(values) {
-  const request = { plate: values.plate.trim() };
+  const request = {
+    plate: values.plate.trim(),
+    homeWarehouseId: Number(values.homeWarehouseId),
+  };
   for (const field of NUMBER_FIELDS) {
     request[field] = Number(values[field]);
   }
   return request;
 }
 
-/** Add / edit form for a truck (`truck` null = add). `onSave(request)` returns a promise. */
-export function TruckForm({ truck, onSave, onCancel }) {
+/**
+ * Add / edit form for a truck (`truck` null = add). `warehouses` feed the home depot select.
+ * `onSave(request)` returns a promise. Availability is not part of the form: it is toggled
+ * from the table and left unchanged by an edit (the request omits it).
+ */
+export function TruckForm({ truck, warehouses, onSave, onCancel }) {
   const form = useForm({
     initialValues: toFormValues(truck),
     validate: {
       plate: textLength("Plate", 2, 15),
+      homeWarehouseId: requiredChoice("Choose the home depot"),
       capacityPallets: numberRange("Capacity", 1, 40, { integer: true }),
       payloadKg: numberRange("Payload", 1, 40000, { integer: true }),
       baseConsumptionLPer100Km: numberRange("Base consumption", 0, 100, {
@@ -62,6 +83,13 @@ export function TruckForm({ truck, onSave, onCancel }) {
           withAsterisk
           data-autofocus
           {...form.getInputProps("plate")}
+        />
+        <NativeSelect
+          label="Home depot"
+          description="Plans from this depot can use the truck"
+          withAsterisk
+          data={depotOptions(warehouses)}
+          {...form.getInputProps("homeWarehouseId")}
         />
         <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md">
           <NumberInput
@@ -109,4 +137,14 @@ export function TruckForm({ truck, onSave, onCancel }) {
       </Stack>
     </form>
   );
+}
+
+function depotOptions(warehouses) {
+  return [
+    { value: "", label: "Select a depot", disabled: true },
+    ...warehouses.map((warehouse) => ({
+      value: String(warehouse.id),
+      label: `${warehouse.name} (${warehouse.city})`,
+    })),
+  ];
 }

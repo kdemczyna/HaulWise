@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.haulwise.HaulWiseApiTest;
 import com.haulwise.domain.Truck;
+import com.haulwise.domain.Warehouse;
 import com.haulwise.repository.RouteLegRepository;
 import com.haulwise.repository.ShipmentRepository;
 import com.haulwise.repository.TruckRepository;
@@ -44,12 +45,15 @@ class TruckApiTest {
     @Autowired
     private WarehouseRepository warehouses;
 
+    private Warehouse home;
+
     @BeforeEach
     void cleanDatabase() {
         routeLegs.deleteAll();
         shipments.deleteAll();
         trucks.deleteAll();
         warehouses.deleteAll();
+        home = warehouses.save(new Warehouse("WAW Central", "Warsaw", 52.2297, 21.0122));
     }
 
     @Test
@@ -62,7 +66,10 @@ class TruckApiTest {
                 .andExpect(jsonPath("$.payloadKg").value(24000))
                 .andExpect(jsonPath("$.baseConsumptionLPer100Km").value(28.0))
                 .andExpect(jsonPath("$.extraConsumptionFullLoadLPer100Km").value(10.0))
-                .andExpect(jsonPath("$.driverCostPlnPerHour").value(45.0));
+                .andExpect(jsonPath("$.driverCostPlnPerHour").value(45.0))
+                .andExpect(jsonPath("$.homeWarehouse.id").value(home.getId()))
+                .andExpect(jsonPath("$.homeWarehouse.name").value("WAW Central"))
+                .andExpect(jsonPath("$.available").value(true));
     }
 
     @Test
@@ -93,8 +100,8 @@ class TruckApiTest {
         String body = """
                 {"plate": "WX 1001A", "capacityPallets": 41, "payloadKg": null,
                  "baseConsumptionLPer100Km": 0, "extraConsumptionFullLoadLPer100Km": 10,
-                 "driverCostPlnPerHour": 45}
-                """;
+                 "driverCostPlnPerHour": 45, "homeWarehouseId": %d}
+                """.formatted(home.getId());
 
         mvc.perform(post("/api/trucks").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
@@ -163,18 +170,93 @@ class TruckApiTest {
     }
 
     @Test
+    void missingHomeDepotReturns400() throws Exception {
+        String body = """
+                {"plate": "WX 1001A", "capacityPallets": 33, "payloadKg": 24000, "baseConsumptionLPer100Km": 28.0,
+                 "extraConsumptionFullLoadLPer100Km": 10.0, "driverCostPlnPerHour": 45.0}
+                """;
+
+        mvc.perform(post("/api/trucks").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", hasSize(1)))
+                .andExpect(jsonPath("$.errors[0].field").value("homeWarehouseId"))
+                .andExpect(jsonPath("$.errors[0].message").value("must not be null"));
+    }
+
+    @Test
+    void unknownHomeDepotReturns400OnCreateAndUpdate() throws Exception {
+        Truck truck = save("WX 2002B");
+
+        mvc.perform(post("/api/trucks").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 33, MISSING_ID, null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("homeWarehouseId"))
+                .andExpect(jsonPath("$.errors[0].message").value("warehouse " + MISSING_ID + " does not exist"));
+        mvc.perform(put("/api/trucks/{id}", truck.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 2002B", 33, MISSING_ID, null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("homeWarehouseId"));
+        assertThat(trucks.count()).isEqualTo(1);
+    }
+
+    @Test
+    void updateMovesTheTruckToAnotherHomeDepot() throws Exception {
+        Truck truck = save("WX 1001A");
+        Warehouse poz = warehouses.save(new Warehouse("POZ West", "Poznan", 52.4064, 16.9252));
+
+        mvc.perform(put("/api/trucks/{id}", truck.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 33, poz.getId(), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homeWarehouse.id").value(poz.getId()))
+                .andExpect(jsonPath("$.homeWarehouse.city").value("Poznan"));
+    }
+
+    @Test
+    void availabilityIsToggledByTheFullUpdateAndKeptWhenOmitted() throws Exception {
+        Truck truck = save("WX 1001A");
+
+        mvc.perform(put("/api/trucks/{id}", truck.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 33, home.getId(), false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false));
+        mvc.perform(put("/api/trucks/{id}", truck.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 18)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacityPallets").value(18))
+                .andExpect(jsonPath("$.available").value(false));
+        mvc.perform(put("/api/trucks/{id}", truck.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 18, home.getId(), true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    void createCanStartAsOnRoute() throws Exception {
+        mvc.perform(post("/api/trucks").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("WX 1001A", 33, home.getId(), false)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    @Test
     void deleteUnknownIdReturns404() throws Exception {
         mvc.perform(delete("/api/trucks/{id}", MISSING_ID)).andExpect(status().isNotFound());
     }
 
     private Truck save(String plate) {
-        return trucks.save(new Truck(plate, 33, 24000, 28.0, 10.0, 45.0));
+        return trucks.save(new Truck(plate, 33, 24000, 28.0, 10.0, 45.0, home));
     }
 
-    private static String json(String plate, int capacityPallets) {
+    private String json(String plate, int capacityPallets) {
+        return json(plate, capacityPallets, home.getId(), null);
+    }
+
+    private static String json(String plate, int capacityPallets, long homeWarehouseId, Boolean available) {
         return """
                 {"plate": "%s", "capacityPallets": %d, "payloadKg": 24000, "baseConsumptionLPer100Km": 28.0,
-                 "extraConsumptionFullLoadLPer100Km": 10.0, "driverCostPlnPerHour": 45.0}
-                """.formatted(plate, capacityPallets);
+                 "extraConsumptionFullLoadLPer100Km": 10.0, "driverCostPlnPerHour": 45.0,
+                 "homeWarehouseId": %d, "available": %s}
+                """.formatted(plate, capacityPallets, homeWarehouseId, available);
     }
 }

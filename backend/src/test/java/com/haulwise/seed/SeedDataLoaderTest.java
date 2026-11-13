@@ -83,7 +83,7 @@ class SeedDataLoaderTest {
     @Test
     void startupSeedsTheDocumentedCounts() {
         assertThat(warehouses.count()).isEqualTo(9);
-        assertThat(trucks.count()).isEqualTo(5);
+        assertThat(trucks.count()).isEqualTo(7);
         assertThat(shipments.count()).isEqualTo(14);
         assertThat(routeLegs.count()).isEqualTo(72);
         assertThat(settings.count()).isEqualTo(1);
@@ -132,7 +132,7 @@ class SeedDataLoaderTest {
 
         assertThat(seeded).isFalse();
         assertThat(warehouses.count()).isEqualTo(9);
-        assertThat(trucks.count()).isEqualTo(5);
+        assertThat(trucks.count()).isEqualTo(7);
         assertThat(shipments.count()).isEqualTo(14);
         assertThat(routeLegs.count()).isEqualTo(72);
         assertThat(settings.count()).isEqualTo(1);

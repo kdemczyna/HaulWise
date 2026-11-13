@@ -1,5 +1,4 @@
 import { SegmentedControl, Group, Stack, Text, Title } from "@mantine/core";
-import { useState } from "react";
 import {
   VARIANT_LABELS,
   VARIANTS,
@@ -15,11 +14,16 @@ const VARIANT_OPTIONS = VARIANTS.map((value) => ({
 }));
 
 /**
- * Map and truck cards of one variant, chosen with an Optimal / Priority toggle.
+ * Map and truck cards of one variant ("optimal" | "priority"), chosen with an Optimal /
+ * Priority toggle; the page owns the choice, so "Send trucks" sends the variant shown.
  * `unusedPlates` names the selected trucks that got no shipment.
  */
-export function RoutesSection({ plan, unusedPlates }) {
-  const [variant, setVariant] = useState("optimal");
+export function RoutesSection({
+  plan,
+  unusedPlates,
+  variant,
+  onVariantChange,
+}) {
   const other = variant === "optimal" ? "priority" : "optimal";
   const routes = plan[variant].routes;
   const allStops = VARIANTS.flatMap((name) =>
@@ -37,7 +41,7 @@ export function RoutesSection({ plan, unusedPlates }) {
           aria-label="Plan shown on the map and in the truck cards"
           data={VARIANT_OPTIONS}
           value={variant}
-          onChange={setVariant}
+          onChange={onVariantChange}
         />
       </Group>
       <Stack gap="md">

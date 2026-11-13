@@ -1,6 +1,6 @@
 import { request } from "./client.js";
 import { getDistances, refreshDistances } from "./distances.js";
-import { createPlan, getPlan } from "./plans.js";
+import { createPlan, dispatchPlan, getPlan } from "./plans.js";
 import { getSettings, updateSettings } from "./settings.js";
 import {
   createShipment,
@@ -8,7 +8,7 @@ import {
   listShipments,
   updateShipment,
 } from "./shipments.js";
-import { deleteTruck, listTrucks } from "./trucks.js";
+import { deleteTruck, listTrucks, setTruckAvailable } from "./trucks.js";
 import {
   createWarehouse,
   getWarehouse,
@@ -67,6 +67,11 @@ describe("resource functions", () => {
       ["POST", "/plans", { depotId: 1 }],
     ],
     ["getPlan", () => getPlan("a b"), ["GET", "/plans/a%20b"]],
+    [
+      "dispatchPlan",
+      () => dispatchPlan("a b", "PRIORITY"),
+      ["POST", "/plans/a%20b/dispatch", { mode: "PRIORITY" }],
+    ],
   ])("%s calls the matching endpoint", async (_, call, expectedArgs) => {
     await expect(call()).resolves.toBe("result");
     expect(request).toHaveBeenCalledWith(...expectedArgs);
@@ -82,5 +87,35 @@ describe("resource functions", () => {
   ])("listShipments(%o) requests %s", async (filters, expectedPath) => {
     await listShipments(filters);
     expect(request).toHaveBeenCalledWith("GET", expectedPath);
+  });
+
+  it("setTruckAvailable reloads the truck and sends the full record with the new flag", async () => {
+    vi.mocked(request)
+      .mockResolvedValueOnce({
+        id: 5,
+        plate: "PO 6006F",
+        capacityPallets: 33,
+        payloadKg: 24000,
+        baseConsumptionLPer100Km: 28,
+        extraConsumptionFullLoadLPer100Km: 10,
+        driverCostPlnPerHour: 45,
+        homeWarehouse: { id: 4, name: "POZ West", city: "Poznan" },
+        available: true,
+      })
+      .mockResolvedValueOnce("saved");
+
+    await expect(setTruckAvailable(5, false)).resolves.toBe("saved");
+
+    expect(request).toHaveBeenNthCalledWith(1, "GET", "/trucks/5");
+    expect(request).toHaveBeenNthCalledWith(2, "PUT", "/trucks/5", {
+      plate: "PO 6006F",
+      capacityPallets: 33,
+      payloadKg: 24000,
+      baseConsumptionLPer100Km: 28,
+      extraConsumptionFullLoadLPer100Km: 10,
+      driverCostPlnPerHour: 45,
+      homeWarehouseId: 4,
+      available: false,
+    });
   });
 });
