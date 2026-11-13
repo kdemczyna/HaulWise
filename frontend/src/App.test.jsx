@@ -12,6 +12,11 @@ vi.mock("./api/trucks.js", () => ({
 vi.mock("./api/shipments.js", () => ({
   listShipments: vi.fn(() => Promise.resolve([])),
 }));
+// The plan stays loading, so the result page never renders the map.
+vi.mock("./api/plans.js", () => ({
+  createPlan: vi.fn(),
+  getPlan: vi.fn(() => new Promise(() => {})),
+}));
 
 function navigation() {
   return within(screen.getByRole("navigation", { name: "Main navigation" }));
@@ -60,10 +65,12 @@ describe("App shell", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("shows the plan result route under Plan a run", () => {
+  it("shows the plan result route under Plan a run", async () => {
     renderWithProviders(<App />, { route: "/plans/abc-123" });
 
-    expect(pageHeading()).toHaveTextContent("Plan result");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Plan result" }),
+    ).toBeInTheDocument();
     expect(
       navigation().getByRole("link", { name: "Plan a run" }),
     ).toHaveAttribute("aria-current", "page");

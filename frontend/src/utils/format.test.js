@@ -1,7 +1,12 @@
 import {
   formatDeadline,
+  formatDuration,
   formatInteger,
   formatKg,
+  formatKm,
+  formatPln,
+  formatSigned,
+  minutesBetween,
   fromDateTimeInput,
   toDateTimeInput,
 } from "./format.js";
@@ -44,5 +49,37 @@ describe("deadline input conversion", () => {
     expect(fromDateTimeInput(toDateTimeInput("2026-11-13T20:00:00"))).toBe(
       "2026-11-13T20:00:00",
     );
+  });
+});
+
+describe("plan number formatters", () => {
+  it("keeps the backend's fraction digits", () => {
+    expect(formatPln(9849.88)).toBe(`9${NBSP}849.88${NBSP}PLN`);
+    expect(formatPln(2632.5)).toBe(`2${NBSP}632.50${NBSP}PLN`);
+    expect(formatKm(3750)).toBe(`3${NBSP}750${NBSP}km`);
+    expect(formatKm(38.5)).toBe(`38.5${NBSP}km`);
+  });
+
+  it.each([
+    [41, "41 min"],
+    [60, "1 h"],
+    [75, "1 h 15 min"],
+    [678, "11 h 18 min"],
+  ])("formats %i minutes as %s", (minutes, text) => {
+    expect(formatDuration(minutes)).toBe(text);
+  });
+
+  it("prefixes the sign", () => {
+    expect(formatSigned(75, formatDuration)).toBe("+1 h 15 min");
+    expect(formatSigned(-12, String)).toBe("-12");
+    expect(formatSigned(0, String)).toBe("0");
+  });
+
+  it("counts minutes between local date-times across midnight", () => {
+    expect(minutesBetween("2026-11-14T12:00:00", "2026-11-14T23:18:00")).toBe(
+      678,
+    );
+    expect(minutesBetween("2026-11-14T23:30", "2026-11-15T00:15")).toBe(45);
+    expect(minutesBetween(null, "2026-11-15T00:15")).toBeNull();
   });
 });
