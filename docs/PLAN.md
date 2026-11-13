@@ -140,7 +140,7 @@ Each task is about 1-3 hours.
 - [x] **T-12** Cost of priority: run optimal and priority plans, compute delta and plain-language text + unit tests. (Must)
 - [x] **T-13** Plan API: `POST /api/plans` (depot, shipment ids, truck ids, return flag) returning both plans, delta and warnings. (Must)
 - [x] **T-14** Frontend setup: routing, API client, layout, CSS design tokens, loading/error/empty components. Add `matchMedia`/`ResizeObserver` mocks to `src/test/setup.js` for Mantine. (Must)
-- [ ] **T-15** Frontend CRUD pages for warehouses, trucks, shipments (forms, validation messages, delete confirm). (Must)
+- [x] **T-15** Frontend CRUD pages for warehouses, trucks, shipments (forms, validation messages, delete confirm). (Must)
 - [ ] **T-16** Plan form and first plan result view; Leaflet map with numbered stops. (Must)
 
 **Day 2 milestone:** a plan can be created from the UI, shown on a map, with the cost-of-priority numbers visible.

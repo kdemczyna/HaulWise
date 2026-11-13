@@ -57,3 +57,48 @@ body {
 .skip-link:focus {
   transform: none;
 }
+
+.hw-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.hw-table-box {
+  overflow: hidden;
+}
+
+.hw-table thead {
+  background-color: var(--hw-color-page);
+}
+
+.hw-table th {
+  color: var(--hw-color-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.hw-danger-button {
+  --button-color: var(--hw-color-danger);
+  color: var(--hw-color-danger);
+}
+
+.hw-filter-fieldset legend,
+.hw-form-fieldset legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+}
+
+.hw-form-footer {
+  padding-top: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--hw-color-border);
+}
+
+.hw-nowrap {
+  white-space: nowrap;
+}
+
+.hw-list[data-reloading] {
+  opacity: 0.6;
+  transition: opacity 150ms;
+}

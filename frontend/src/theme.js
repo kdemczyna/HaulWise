@@ -1,4 +1,12 @@
-import { Button, Card, NavLink, Paper, createTheme } from "@mantine/core";
+import {
+  Button,
+  Card,
+  Modal,
+  NavLink,
+  Notification,
+  Paper,
+  createTheme,
+} from "@mantine/core";
 
 /**
  * Design tokens (visual design approved by the user on 2026-11-13, ARCHITECTURE section 8).
@@ -80,6 +88,15 @@ export const theme = createTheme({
     Card: Card.extend({ defaultProps: { radius: 10 } }),
     Paper: Paper.extend({ defaultProps: { radius: 10 } }),
     NavLink: NavLink.extend({ classNames: { root: "hw-nav-link" } }),
+    // Icon-only close buttons need an accessible name.
+    Modal: Modal.extend({
+      defaultProps: { closeButtonProps: { "aria-label": "Close dialog" } },
+    }),
+    Notification: Notification.extend({
+      defaultProps: {
+        closeButtonProps: { "aria-label": "Close notification" },
+      },
+    }),
   },
 });
 
@@ -101,6 +118,7 @@ export const cssVariablesResolver = () => ({
     "--mantine-color-text": tokens.text,
     "--mantine-color-dimmed": tokens.muted,
     "--mantine-color-default-border": tokens.border,
+    "--mantine-color-error": tokens.danger,
   },
   dark: {},
 });

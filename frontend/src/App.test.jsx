@@ -2,6 +2,17 @@ import { screen, waitFor, within } from "@testing-library/react";
 import App from "./App.jsx";
 import { renderWithProviders } from "./test/renderWithProviders.jsx";
 
+// Shell tests never reach the network: the pages' api modules answer with empty lists.
+vi.mock("./api/warehouses.js", () => ({
+  listWarehouses: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock("./api/trucks.js", () => ({
+  listTrucks: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock("./api/shipments.js", () => ({
+  listShipments: vi.fn(() => Promise.resolve([])),
+}));
+
 function navigation() {
   return within(screen.getByRole("navigation", { name: "Main navigation" }));
 }

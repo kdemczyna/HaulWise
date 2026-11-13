@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { notifications } from "@mantine/notifications";
 
 // jsdom lacks these browser APIs; Mantine needs them (see Mantine's Vitest guide).
 Object.defineProperty(window, "matchMedia", {
@@ -23,3 +24,8 @@ class ResizeObserverMock {
 window.ResizeObserver = ResizeObserverMock;
 
 window.HTMLElement.prototype.scrollIntoView = () => {};
+
+// Notifications live in a module-level store; start every test without leftovers.
+afterEach(() => {
+  notifications.clean();
+});
