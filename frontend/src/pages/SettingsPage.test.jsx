@@ -41,6 +41,29 @@ describe("SettingsPage", () => {
     );
   });
 
+  it("disables the compliance and consolidation fields, which aren't wired to the planner yet", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    expect(await screen.findByRole("switch")).toBeDisabled();
+    expect(
+      screen.getByRole("textbox", { name: /Max continuous driving/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("textbox", { name: /Break length/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("textbox", { name: /Max daily driving/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("textbox", { name: /Fill threshold/ }),
+    ).toBeDisabled();
+    expect(screen.getAllByText(/Not used yet/)).toHaveLength(2);
+    // Everything else stays editable.
+    expect(
+      screen.getByRole("textbox", { name: /Diesel price/ }),
+    ).not.toBeDisabled();
+  });
+
   it("shows a load error and retries", async () => {
     getSettings
       .mockRejectedValueOnce(

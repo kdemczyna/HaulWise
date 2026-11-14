@@ -6,6 +6,7 @@ import {
   SimpleGrid,
   Stack,
   Switch,
+  Text,
   Title,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
@@ -162,8 +163,17 @@ export function SettingsForm({ settings, onSave }) {
           <Title order={2} size="h4" id="compliance-title">
             Compliance
           </Title>
+          <Text id="compliance-note" size="sm" c="dimmed">
+            Not used yet: these values are saved, but the planner doesn&rsquo;t
+            check driving time against them or warn about a violation (that
+            feature was planned, then cut to protect the deadline). Fields are
+            disabled so changing them doesn&rsquo;t look like it changes
+            planning.
+          </Text>
           <Switch
             label="Enforce EU driving-time limits"
+            disabled
+            aria-describedby="compliance-note"
             {...form.getInputProps("complianceEnabled", { type: "checkbox" })}
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
@@ -172,6 +182,8 @@ export function SettingsForm({ settings, onSave }) {
               description="30 to 900, must be <= max daily driving"
               withAsterisk
               allowDecimal={false}
+              disabled
+              aria-describedby="compliance-note"
               {...form.getInputProps("maxContinuousDrivingMinutes")}
             />
             <NumberInput
@@ -179,6 +191,8 @@ export function SettingsForm({ settings, onSave }) {
               description="15 to 180"
               withAsterisk
               allowDecimal={false}
+              disabled
+              aria-describedby="compliance-note"
               {...form.getInputProps("breakMinutes")}
             />
             <NumberInput
@@ -186,6 +200,8 @@ export function SettingsForm({ settings, onSave }) {
               description="60 to 900"
               withAsterisk
               allowDecimal={false}
+              disabled
+              aria-describedby="compliance-note"
               {...form.getInputProps("maxDailyDrivingMinutes")}
             />
           </SimpleGrid>
@@ -199,12 +215,19 @@ export function SettingsForm({ settings, onSave }) {
           <Title order={2} size="h4" id="consolidation-title">
             Consolidation
           </Title>
+          <Text id="consolidation-note" size="sm" c="dimmed">
+            Not used yet: the planner doesn&rsquo;t suggest merging under-filled
+            trucks (that feature was planned, then cut to protect the deadline).
+            Disabled so this doesn&rsquo;t look like a live setting.
+          </Text>
           <NumberInput
             label="Fill threshold (%)"
             description="1 to 100"
             withAsterisk
             allowDecimal={false}
             maw={240}
+            disabled
+            aria-describedby="consolidation-note"
             {...form.getInputProps("consolidationFillThresholdPct")}
           />
         </Stack>

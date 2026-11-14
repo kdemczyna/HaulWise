@@ -1,5 +1,7 @@
 # HaulWise
 
+[![CI](https://github.com/kdemczyna/HaulWise/actions/workflows/ci.yml/badge.svg)](https://github.com/kdemczyna/HaulWise/actions/workflows/ci.yml)
+
 A dispatcher tool for a fictional Polish logistics company that moves goods between warehouses by truck. For one run from a single depot, HaulWise packs shipments onto trucks, chooses the stop order, and picks the route that is optimal by fuel cost and travel time. The dispatcher can also prioritise deliveries even when that is not the cheapest choice.
 
 **Headline feature: "cost of priority".** The app runs the solver twice — once ignoring priorities (optimal) and once respecting them (priority) — and shows both plans side by side with a plain-language delta, e.g. *"Delivering Gdansk first costs 292.97 PLN more (85 km and 1 h 15 min longer)."*
@@ -127,6 +129,7 @@ That leaner process is also what let the project go *beyond* the original MVP on
 - **Truck recommendation only searches one depot's own fleet, and only up to a cap.** `/api/trucks/recommend` tries every combination of a depot's available trucks when there are at most `haulwise.solver.max-recommendation-trucks` of them (default 7; the startup-validated limit of 12 measured ~21 s per request, so the default stays well under that); above the cap it falls back to a documented, not-guaranteed-optimal greedy approach.
 - **The map needs internet access** for OpenStreetMap tiles; offline, it degrades to an inline notice while the stop list and timeline (the full text alternative) remain fully usable.
 - **Moving a warehouse resets its distance legs to estimates.** Updating a warehouse's coordinates deletes its stored legs (they would be stale); moving it back to the old coordinates does **not** restore the original seeded legs — they stay estimated (haversine × road factor) until the database is reseeded on a restart.
+- **The Settings page's Compliance and Consolidation fields are disabled.** They're stored and validated by the backend, but nothing in the planner reads them (both features were planned, then cut to protect the deadline — see Future work). They're disabled, with a visible note, rather than editable-but-silently-ignored.
 - **A pin can delay a different urgent shipment.** The hard "pin first" rule only guarantees the pinned stop is visited first on its truck; it can push a non-pinned URGENT shipment on the same truck later than it would otherwise go, which QA observed and is intentional (documented) solver behaviour, not a bug.
 - **CORS has a default allowed origin** (`http://localhost:5173`/`127.0.0.1:5173`) baked in for local development; change `HAULWISE_CORS_ALLOWED_ORIGINS` for any other setup.
 - **No authentication.** This is a single-user demo application; anyone who can reach the API can use it.
