@@ -84,6 +84,25 @@ class OpenApiDocsTest {
     }
 
     @Test
+    void recentPlansListComesFirstUnderPlansWithoutErrorResponses() throws Exception {
+        String json = mvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
+        JsonNode paths = objectMapper.readTree(json).get("paths");
+        List<String> pathOrder = new ArrayList<>();
+        paths.fieldNames().forEachRemaining(pathOrder::add);
+        List<String> collectionMethods = new ArrayList<>();
+        paths.get("/api/plans").fieldNames().forEachRemaining(collectionMethods::add);
+        JsonNode list = paths.get("/api/plans").get("get");
+
+        assertThat(pathOrder.indexOf("/api/plans")).isLessThan(pathOrder.indexOf("/api/plans/{id}"));
+        assertThat(collectionMethods).containsExactly("get", "post");
+        assertThat(list.get("tags").get(0).asText()).isEqualTo("Plans");
+        assertThat(list.get("summary").asText()).isEqualTo("List recent plans");
+        assertThat(list.get("responses").has("200")).isTrue();
+        assertThat(list.get("responses").has("400")).isFalse();
+        assertThat(list.get("responses").has("404")).isFalse();
+    }
+
+    @Test
     void errorResponsesUseTheProblemSchema() throws Exception {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(jsonPath("$.components.schemas.Problem.properties.code").exists())

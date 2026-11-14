@@ -14,6 +14,7 @@ vi.mock("./api/shipments.js", () => ({
 }));
 // The plan stays loading, so the result page never renders the map.
 vi.mock("./api/plans.js", () => ({
+  listPlans: vi.fn(() => Promise.resolve([])),
   createPlan: vi.fn(),
   getPlan: vi.fn(() => new Promise(() => {})),
 }));
@@ -38,7 +39,14 @@ describe("App shell", () => {
       navigation()
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Plan a run", "Shipments", "Trucks", "Warehouses", "Settings"]);
+    ).toEqual([
+      "Plan a run",
+      "Recent plans",
+      "Shipments",
+      "Trucks",
+      "Warehouses",
+      "Settings",
+    ]);
     expect(pageHeading()).toHaveTextContent("Plan a run");
     expect(
       navigation().getByRole("link", { name: "Plan a run" }),
@@ -46,6 +54,7 @@ describe("App shell", () => {
   });
 
   it.each([
+    ["Recent plans", "Recent plans"],
     ["Shipments", "Shipments"],
     ["Trucks", "Trucks"],
     ["Warehouses", "Warehouses"],
@@ -74,6 +83,9 @@ describe("App shell", () => {
     expect(
       navigation().getByRole("link", { name: "Plan a run" }),
     ).toHaveAttribute("aria-current", "page");
+    expect(
+      navigation().getByRole("link", { name: "Recent plans" }),
+    ).not.toHaveAttribute("aria-current");
   });
 
   it("shows a not-found page with a way back for unknown routes", async () => {
@@ -86,14 +98,21 @@ describe("App shell", () => {
     expect(pageHeading()).toHaveTextContent("Plan a run");
   });
 
-  it("does not highlight Plan a run for /plans/ without an id", () => {
-    renderWithProviders(<App />, { route: "/plans/" });
+  it.each(["/plans", "/plans/"])(
+    "shows Recent plans, not a single plan, at %s",
+    async (route) => {
+      renderWithProviders(<App />, { route });
 
-    expect(pageHeading()).toHaveTextContent("Page not found");
-    expect(
-      navigation().getByRole("link", { name: "Plan a run" }),
-    ).not.toHaveAttribute("aria-current");
-  });
+      expect(pageHeading()).toHaveTextContent("Recent plans");
+      expect(await screen.findByText("No plans yet")).toBeInTheDocument();
+      expect(
+        navigation().getByRole("link", { name: "Recent plans" }),
+      ).toHaveAttribute("aria-current", "page");
+      expect(
+        navigation().getByRole("link", { name: "Plan a run" }),
+      ).not.toHaveAttribute("aria-current");
+    },
+  );
 
   it("sets the document title and focuses the new page heading after navigation", async () => {
     const { user } = renderWithProviders(<App />);

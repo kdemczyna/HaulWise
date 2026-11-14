@@ -4,6 +4,7 @@ import { AppLayout } from "./components/common/AppLayout.jsx";
 import { LoadingState } from "./components/common/LoadingState.jsx";
 import { NotFoundPage } from "./pages/NotFoundPage.jsx";
 import { PlanPage } from "./pages/PlanPage.jsx";
+import { RecentPlansPage } from "./pages/RecentPlansPage.jsx";
 import { SettingsPage } from "./pages/SettingsPage.jsx";
 import { ShipmentsPage } from "./pages/ShipmentsPage.jsx";
 import { TrucksPage } from "./pages/TrucksPage.jsx";
@@ -21,6 +22,7 @@ function App() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<PlanPage />} />
+        <Route path="plans" element={<RecentPlansPage />} />
         <Route
           path="plans/:id"
           element={

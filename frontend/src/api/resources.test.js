@@ -1,6 +1,6 @@
 import { request } from "./client.js";
 import { getDistances, refreshDistances } from "./distances.js";
-import { createPlan, dispatchPlan, getPlan } from "./plans.js";
+import { createPlan, dispatchPlan, getPlan, listPlans } from "./plans.js";
 import { getSettings, updateSettings } from "./settings.js";
 import {
   createShipment,
@@ -61,6 +61,7 @@ describe("resource functions", () => {
       () => refreshDistances(),
       ["POST", "/distances/refresh"],
     ],
+    ["listPlans", () => listPlans(), ["GET", "/plans"]],
     [
       "createPlan",
       () => createPlan({ depotId: 1 }),

@@ -2,7 +2,9 @@ package com.haulwise.service;
 
 import com.haulwise.dto.plan.PlanResponse;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,7 +21,16 @@ public class PlanStore {
 
     static final int DEFAULT_CAPACITY = 50;
 
-    private final Map<UUID, PlanResponse> plans;
+    /** Newest created first; plans created in the same second (createdAt is truncated) newest saved first. */
+    private static final Comparator<Stored> NEWEST_FIRST = Comparator
+            .comparing((Stored entry) -> entry.plan().createdAt())
+            .thenComparingLong(Stored::saved)
+            .reversed();
+
+    /** Access-ordered for LRU eviction, so its iteration order is NOT creation order. */
+    private final Map<UUID, Stored> plans;
+
+    private long saves;
 
     public PlanStore() {
         this(DEFAULT_CAPACITY);
@@ -31,18 +42,47 @@ public class PlanStore {
         }
         this.plans = new LinkedHashMap<>(capacity + 1, 1.0f, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<UUID, PlanResponse> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<UUID, Stored> eldest) {
                 return size() > capacity;
             }
         };
     }
 
     public synchronized void save(PlanResponse plan) {
-        plans.put(plan.id(), plan);
+        plans.put(plan.id(), new Stored(plan, ++saves));
     }
 
     /** The plan with this id; empty when unknown, evicted, or the id is not a UUID. */
     public synchronized Optional<PlanResponse> find(String id) {
+        return findStored(id).map(Stored::plan);
+    }
+
+    /**
+     * Replaces the stored plan with a copy whose {@code dispatchedAt} is set (T-33); the copy counts as a use.
+     *
+     * @return the updated plan; empty when unknown, evicted, or the id is not a UUID
+     */
+    public synchronized Optional<PlanResponse> markDispatched(String id, LocalDateTime at) {
+        return findStored(id).map(entry -> {
+            PlanResponse dispatched = entry.plan().withDispatchedAt(at);
+            plans.put(dispatched.id(), new Stored(dispatched, entry.saved()));
+            return dispatched;
+        });
+    }
+
+    /**
+     * Every stored plan, newest created first (T-34). Sorted explicitly rather than read in map order, which is
+     * access order and would change on every {@link #find} or {@link #markDispatched}. Does not count as a use.
+     */
+    public synchronized List<PlanResponse> listNewestFirst() {
+        return plans.values().stream().sorted(NEWEST_FIRST).map(Stored::plan).toList();
+    }
+
+    synchronized int size() {
+        return plans.size();
+    }
+
+    private Optional<Stored> findStored(String id) {
         UUID uuid;
         try {
             uuid = UUID.fromString(id);
@@ -52,20 +92,7 @@ public class PlanStore {
         return Optional.ofNullable(plans.get(uuid));
     }
 
-    /**
-     * Replaces the stored plan with a copy whose {@code dispatchedAt} is set (T-33); the copy counts as a use.
-     *
-     * @return the updated plan; empty when unknown, evicted, or the id is not a UUID
-     */
-    public synchronized Optional<PlanResponse> markDispatched(String id, LocalDateTime at) {
-        return find(id).map(plan -> {
-            PlanResponse dispatched = plan.withDispatchedAt(at);
-            plans.put(plan.id(), dispatched);
-            return dispatched;
-        });
-    }
-
-    synchronized int size() {
-        return plans.size();
+    /** A stored plan and the number of its save, the tie-break between plans created in the same second. */
+    private record Stored(PlanResponse plan, long saved) {
     }
 }

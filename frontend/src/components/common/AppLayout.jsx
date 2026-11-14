@@ -14,6 +14,12 @@ const NAV_ITEMS = [
     isActive: (pathname) =>
       pathname === "/" || matchPath("/plans/:id", pathname) !== null,
   },
+  {
+    label: "Recent plans",
+    to: "/plans",
+    // Only the list itself: a single plan (/plans/:id) stays under "Plan a run".
+    isActive: (pathname) => matchPath("/plans", pathname) !== null,
+  },
   { label: "Shipments", to: "/shipments" },
   { label: "Trucks", to: "/trucks" },
   { label: "Warehouses", to: "/warehouses" },
