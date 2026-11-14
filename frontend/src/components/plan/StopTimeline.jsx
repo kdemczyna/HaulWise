@@ -29,7 +29,22 @@ function DeadlineStatus({ stop }) {
   );
 }
 
-/** Numbered stops of one route in driving order: arrival, drop, priority, pin and deadline status. */
+function ShipmentReferences({ references = [] }) {
+  if (references.length === 0) {
+    return null;
+  }
+  return (
+    <Text size="sm">
+      {references.length === 1 ? "Shipment" : "Shipments"}:{" "}
+      <span className="hw-numeric">{references.join(", ")}</span>
+    </Text>
+  );
+}
+
+/**
+ * Numbered stops of one route in driving order: arrival, drop, the shipments unloaded, priority,
+ * pin and deadline status.
+ */
 export function StopTimeline({ stops, variant }) {
   return (
     <ol className="hw-stops">
@@ -54,6 +69,7 @@ export function StopTimeline({ stops, variant }) {
               Arrives {formatDateTime(stop.arrivalTime)}, drops{" "}
               {stop.dropPallets} pallets
             </Text>
+            <ShipmentReferences references={stop.shipmentReferences} />
             <DeadlineStatus stop={stop} />
           </Stack>
         </li>

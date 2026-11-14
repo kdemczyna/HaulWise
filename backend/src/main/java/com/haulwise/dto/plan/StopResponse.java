@@ -11,6 +11,9 @@ import java.util.List;
  * One delivery stop of a route, with the leg that leads to it.
  *
  * @param sequence 1-based position on the route
+ * @param shipmentIds shipments unloaded here, most important first
+ * @param shipmentReferences their references, in the same order as {@code shipmentIds}; taken when the plan is
+ *        created, so a stored plan keeps them even if a shipment is later edited or deleted
  * @param priority most important priority of the shipments unloaded here
  * @param pinned whether this stop carries the truck's kept pin-first request (after PIN_CONFLICT resolution). The
  *        same in both variants: only PRIORITY forces the stop first, OPTIMAL ignores the pin, so in OPTIMAL a
@@ -30,6 +33,7 @@ public record StopResponse(
         double lat,
         double lon,
         List<Long> shipmentIds,
+        List<String> shipmentReferences,
         int dropPallets,
         int dropWeightKg,
         Priority priority,
@@ -49,5 +53,9 @@ public record StopResponse(
 
     public StopResponse {
         shipmentIds = List.copyOf(shipmentIds);
+        shipmentReferences = List.copyOf(shipmentReferences);
+        if (shipmentReferences.size() != shipmentIds.size()) {
+            throw new IllegalArgumentException("One reference per shipment id expected");
+        }
     }
 }

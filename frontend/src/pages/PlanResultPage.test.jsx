@@ -103,6 +103,17 @@ describe("PlanResultPage", () => {
     expect(priorityStops[0]).not.toContain("ignored by optimal");
   });
 
+  it("names every shipment unloaded at each stop", async () => {
+    renderPage();
+    await screen.findByRole("article", { name: "Truck WX 1001A" });
+
+    const stops = stopTexts("WX 1001A");
+    expect(stops[0]).toContain("Shipment: PO-1041");
+    expect(stops[2]).toContain("Shipments: PO-1042, PO-1050");
+    expect(stops[2]).toContain("drops 12 pallets");
+    expect(stopTexts("WX 2002B")[0]).toContain("Shipment: PO-1044");
+  });
+
   it("collapses identical routes and lists unused trucks, unloaded shipments and warnings", async () => {
     renderPage();
     await screen.findByRole("article", { name: "Truck WX 2002B" });
@@ -244,7 +255,8 @@ describe("PlanResultPage", () => {
       ],
       removedShipments: [{ id: 2, reference: "PO-1042" }],
     });
-    // Only the priority routes carry shipment ids, so the counts prove which variant is sent.
+    // The priority routes get one shipment per stop (4) while the optimal ones carry 5,
+    // so the counts prove which variant is sent.
     const plan = {
       ...DEMO_PLAN,
       priority: {
@@ -254,6 +266,7 @@ describe("PlanResultPage", () => {
           stops: route.stops.map((stop, j) => ({
             ...stop,
             shipmentIds: [10 * i + j + 1],
+            shipmentReferences: [`PO-${10 * i + j + 1}`],
           })),
         })),
       },

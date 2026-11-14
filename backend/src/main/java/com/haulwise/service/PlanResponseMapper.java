@@ -111,7 +111,7 @@ final class PlanResponseMapper {
         LocalDateTime arrival = at(leg.arrivalMinutes());
         LocalDateTime deadline = stop.earliestDeadline();
         return new StopResponse(sequence, warehouse.id(), warehouse.name(), warehouse.city(), warehouse.lat(),
-                warehouse.lon(), stop.shipmentIds(), stop.dropPallets(), stop.dropWeightKg(),
+                warehouse.lon(), stop.shipmentIds(), references(stop.shipmentIds()), stop.dropPallets(), stop.dropWeightKg(),
                 Priority.valueOf(stop.maxPriority().name()), stop.pinned(),
                 PlanNumbers.km(leg.distanceKm()), PlanNumbers.minutes(leg.drivingMinutes()),
                 PlanNumbers.litres(leg.litres()), PlanNumbers.pln(leg.costPln()), leg.distance().source(),
@@ -139,8 +139,12 @@ final class PlanResponseMapper {
                 .findFirst()
                 .map(stop -> warehouse(stop.warehouseId()).city())
                 .orElseThrow(() -> new IllegalStateException("No kept pin on truck " + truckId));
-        List<String> references = warning.shipmentIds().stream().map(id -> shipment(id).reference()).toList();
-        return PlanWarnings.pinConflict(truckId, plate(truckId), keptCity, references, warning.shipmentIds());
+        return PlanWarnings.pinConflict(truckId, plate(truckId), keptCity, references(warning.shipmentIds()),
+                warning.shipmentIds());
+    }
+
+    private List<String> references(List<Long> shipmentIds) {
+        return shipmentIds.stream().map(id -> shipment(id).reference()).toList();
     }
 
     /** Distinct estimated legs driven in either variant, as "From -> To" warehouse names. */
