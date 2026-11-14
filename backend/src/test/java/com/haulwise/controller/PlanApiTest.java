@@ -152,6 +152,7 @@ class PlanApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].city").value("Bstadt"))
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].lat").value(51.0))
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].shipmentIds", contains(shipment.getId().intValue())))
+                .andExpect(jsonPath("$.optimal.routes[0].stops[0].shipmentReferences", contains("PO-1")))
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].dropPallets").value(10))
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].dropWeightKg").value(12000))
                 .andExpect(jsonPath("$.optimal.routes[0].stops[0].priority").value("NORMAL"))
@@ -221,6 +222,49 @@ class PlanApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].returnLeg").value(nullValue()))
                 .andExpect(jsonPath("$.optimal.routes[0].returnTime").value(nullValue()))
                 .andExpect(jsonPath("$.optimal.totals.distanceKm").value(100.0));
+    }
+
+    /**
+     * Three drops at Bstadt, requested as PO-1, PO-2, PO-3: the stop lists them most important first (URGENT PO-2,
+     * then the larger NORMAL PO-3), and each reference sits at the same index as its id.
+     */
+    @Test
+    void stopListsEveryShipmentReferenceInTheOrderOfItsIds() throws Exception {
+        storeLegBothWays(depot, bstadt, 100, 90);
+        Shipment small = shipment("PO-1", bstadt, 2, 1000, Priority.NORMAL, false, null);
+        Shipment urgent = shipment("PO-2", bstadt, 3, 1000, Priority.URGENT, false, null);
+        Shipment large = shipment("PO-3", bstadt, 5, 1000, Priority.NORMAL, false, null);
+
+        createPlan(request(depot.getId(), List.of(small.getId(), urgent.getId(), large.getId()),
+                List.of(truck.getId()), true, DEPARTURE))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.optimal.routes[0].stops", hasSize(1)))
+                .andExpect(jsonPath("$.optimal.routes[0].stops[0].shipmentIds", contains(urgent.getId().intValue(),
+                        large.getId().intValue(), small.getId().intValue())))
+                .andExpect(jsonPath("$.optimal.routes[0].stops[0].shipmentReferences",
+                        contains("PO-2", "PO-3", "PO-1")))
+                .andExpect(jsonPath("$.priority.routes[0].stops[0].shipmentReferences",
+                        contains("PO-2", "PO-3", "PO-1")));
+    }
+
+    @Test
+    void storedPlanKeepsItsShipmentReferencesAfterTheShipmentsChange() throws Exception {
+        storeLegBothWays(depot, bstadt, 100, 90);
+        Shipment renamed = shipment("PO-1", bstadt, 5, 1000, Priority.NORMAL, false, null);
+        Shipment deleted = shipment("PO-2", bstadt, 2, 1000, Priority.NORMAL, false, null);
+        String body = createPlan(request(depot.getId(), List.of(renamed.getId(), deleted.getId()),
+                List.of(truck.getId()), true, DEPARTURE))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = objectMapper.readTree(body).get("id").asText();
+
+        renamed.setReference("PO-1-RENAMED");
+        shipments.save(renamed);
+        shipments.delete(deleted);
+
+        mvc.perform(get("/api/plans/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.optimal.routes[0].stops[0].shipmentReferences", contains("PO-1", "PO-2")));
     }
 
     @Test

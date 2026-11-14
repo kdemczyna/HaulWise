@@ -274,7 +274,7 @@ class PlanDispatchApiTest {
 
     private static RouteResponse route(Truck truck, Shipment shipment) {
         StopResponse stop = new StopResponse(1, shipment.getDestination().getId(), "", "", 0, 0,
-                List.of(shipment.getId()), shipment.getPallets(), shipment.getWeightKg(),
+                List.of(shipment.getId()), List.of(shipment.getReference()), shipment.getPallets(), shipment.getWeightKg(),
                 Priority.NORMAL, false, null, 0, null, null, null, 0, null, null, null, false);
         return new RouteResponse(truck.getId(), truck.getPlate(), 0, null, null, null, List.of(stop), null, null,
                 List.of());
