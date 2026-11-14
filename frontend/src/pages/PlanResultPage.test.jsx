@@ -131,6 +131,52 @@ describe("PlanResultPage", () => {
     );
   });
 
+  it("shows the EU driving-time warnings on the truck card of their plan", async () => {
+    const breakMessage =
+      "WX 1001A reaches 4 h 30 min of continuous driving on WAW Central -> GDN Port. Take a 45 min break before ~13 Nov, 10:30.";
+    const dailyMessage =
+      "WX 1001A drives 21 h 54 min in total, more than the 9 h daily driving limit. Plan a second driver or split the route.";
+    const [first, ...rest] = DEMO_PLAN.priority.routes;
+    const complianceWarning = (code, message) => ({
+      code,
+      severity: "WARNING",
+      message,
+      truckId: first.truckId,
+      shipmentIds: [],
+    });
+    const { user } = renderPage({
+      ...DEMO_PLAN,
+      priority: {
+        ...DEMO_PLAN.priority,
+        routes: [
+          {
+            ...first,
+            warnings: [
+              complianceWarning("BREAK_REQUIRED", breakMessage),
+              complianceWarning("DAILY_DRIVING_EXCEEDED", dailyMessage),
+            ],
+          },
+          ...rest,
+        ],
+      },
+    });
+    await screen.findByRole("article", { name: "Truck WX 1001A" });
+
+    // The optimal card's DEADLINE_MISSED stays in the timeline and the warnings panel only.
+    expect(truckCard("WX 1001A").queryByText("Driving time")).toBeNull();
+
+    await user.click(screen.getByRole("radio", { name: "Priority" }));
+
+    const card = truckCard("WX 1001A");
+    expect(card.getByText("Driving time")).toBeInTheDocument();
+    expect(card.getByText(breakMessage)).toBeInTheDocument();
+    expect(card.getByText(dailyMessage)).toBeInTheDocument();
+    const panel = within(screen.getByRole("region", { name: "Warnings" }));
+    expect(panel.getByText(dailyMessage)).toHaveTextContent(
+      `Priority plan: ${dailyMessage}`,
+    );
+  });
+
   it("shows the no-extra-cost variant", async () => {
     renderPage({
       ...DEMO_PLAN,

@@ -1,6 +1,7 @@
 import {
   allWarnings,
   dispatchScope,
+  drivingTimeWarnings,
   minutesLate,
   sameRoute,
   unusedTruckIds,
@@ -76,6 +77,24 @@ describe("unusedTruckIds and allWarnings", () => {
       ["ESTIMATED_DISTANCE", null],
       ["DEADLINE_MISSED", "optimal"],
     ]);
+  });
+});
+
+describe("drivingTimeWarnings", () => {
+  it("keeps only the EU driving-time warnings, in order", () => {
+    const route = {
+      warnings: [
+        { code: "DEADLINE_MISSED" },
+        { code: "BREAK_REQUIRED", message: "break" },
+        { code: "DAILY_DRIVING_EXCEEDED", message: "daily" },
+      ],
+    };
+
+    expect(drivingTimeWarnings(route).map((w) => w.message)).toEqual([
+      "break",
+      "daily",
+    ]);
+    expect(drivingTimeWarnings({ warnings: [] })).toEqual([]);
   });
 });
 

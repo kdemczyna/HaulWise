@@ -17,6 +17,7 @@ import com.haulwise.config.ClockConfig;
 import com.haulwise.domain.LegSource;
 import com.haulwise.domain.Priority;
 import com.haulwise.domain.RouteLeg;
+import com.haulwise.domain.Settings;
 import com.haulwise.domain.Shipment;
 import com.haulwise.domain.Truck;
 import com.haulwise.domain.Warehouse;
@@ -291,6 +292,51 @@ class PlanApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].message").value(
                         "WX 1001A arrives in Bstadt at 13 Nov, 07:30, after the deadline of PO-1 (13 Nov, 07:00)."))
                 .andExpect(jsonPath("$.warnings", hasSize(0)));
+    }
+
+    /**
+     * T-22: 300 min out and 300 min back. The 270 min limit is reached on the way out (06:00 + 4 h 30 = 10:30) and,
+     * counting from that break, 240 min into the return leg (06:00 + 300 + 30 service + 240 = 15:30); 600 min of
+     * driving exceed the 9 h day. Warnings only: the times and the cost are those without the check.
+     */
+    @Test
+    void complianceCheckAddsBreakAndDailyWarningsToTheRoute() throws Exception {
+        storeLegBothWays(depot, bstadt, 400, 300);
+        Shipment shipment = shipment("PO-1", bstadt, 10, 12000, Priority.NORMAL, false, null);
+
+        createPlan(request(depot.getId(), List.of(shipment.getId()), List.of(truck.getId()), true, DEPARTURE))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.optimal.routes[0].stops[0].arrivalTime").value("2026-11-13T11:00:00"))
+                .andExpect(jsonPath("$.optimal.routes[0].returnTime").value("2026-11-13T16:30:00"))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings", hasSize(3)))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[0].code").value("BREAK_REQUIRED"))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[0].severity").value("WARNING"))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[0].truckId").value(truck.getId()))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[0].shipmentIds", hasSize(0)))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[0].message").value("WX 1001A reaches 4 h 30 min "
+                        + "of continuous driving on Depot A -> B Hub. Take a 45 min break before ~13 Nov, 10:30."))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[1].message").value("WX 1001A reaches 4 h 30 min "
+                        + "of continuous driving on B Hub -> Depot A. Take a 45 min break before ~13 Nov, 15:30."))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[2].code").value("DAILY_DRIVING_EXCEEDED"))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings[2].message").value("WX 1001A drives 10 h in total, "
+                        + "more than the 9 h daily driving limit. Plan a second driver or split the route."))
+                .andExpect(jsonPath("$.priority.routes[0].warnings", hasSize(3)))
+                .andExpect(jsonPath("$.warnings", hasSize(0)));
+    }
+
+    @Test
+    void complianceCheckIsSkippedWhenDisabledInTheSettings() throws Exception {
+        Settings disabled = Settings.withDefaults();
+        disabled.setComplianceEnabled(false);
+        settings.save(disabled);
+        storeLegBothWays(depot, bstadt, 400, 300);
+        Shipment shipment = shipment("PO-1", bstadt, 10, 12000, Priority.NORMAL, false, null);
+
+        createPlan(request(depot.getId(), List.of(shipment.getId()), List.of(truck.getId()), true, DEPARTURE))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.optimal.routes[0].returnTime").value("2026-11-13T16:30:00"))
+                .andExpect(jsonPath("$.optimal.routes[0].warnings", hasSize(0)))
+                .andExpect(jsonPath("$.priority.routes[0].warnings", hasSize(0)));
     }
 
     /**

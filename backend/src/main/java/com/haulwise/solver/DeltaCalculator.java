@@ -119,8 +119,8 @@ public final class DeltaCalculator {
         return distance + " " + longerOrShorter(km) + ", " + time + " " + longerOrShorter(minutes);
     }
 
-    /** Whole minutes: "41 min", "1 h 15 min", "2 h". */
-    static String duration(int minutes) {
+    /** Whole minutes: "41 min", "1 h 15 min", "2 h". Also used by the plan service's warning texts. */
+    public static String duration(int minutes) {
         int hours = minutes / MINUTES_PER_HOUR;
         int rest = minutes % MINUTES_PER_HOUR;
         if (hours == 0) {

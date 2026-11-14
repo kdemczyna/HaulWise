@@ -41,27 +41,65 @@ describe("SettingsPage", () => {
     );
   });
 
-  it("disables the compliance and consolidation fields, which aren't wired to the planner yet", async () => {
-    renderWithProviders(<SettingsPage />);
+  it("lets the dispatcher edit and save the compliance settings", async () => {
+    updateSettings.mockResolvedValue({
+      ...SETTINGS,
+      complianceEnabled: false,
+      maxContinuousDrivingMinutes: 240,
+    });
+    const { user } = renderWithProviders(<SettingsPage />);
+    const complianceSwitch = await screen.findByRole("switch", {
+      name: "Enforce EU driving-time limits",
+    });
+    const continuous = screen.getByRole("textbox", {
+      name: /Max continuous driving/,
+    });
 
-    expect(await screen.findByRole("switch")).toBeDisabled();
-    expect(
-      screen.getByRole("textbox", { name: /Max continuous driving/ }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("textbox", { name: /Break length/ }),
-    ).toBeDisabled();
+    expect(complianceSwitch).toBeEnabled();
+    expect(continuous).toBeEnabled();
+    expect(screen.getByRole("textbox", { name: /Break length/ })).toBeEnabled();
     expect(
       screen.getByRole("textbox", { name: /Max daily driving/ }),
-    ).toBeDisabled();
+    ).toBeEnabled();
+    expect(complianceSwitch).toHaveAccessibleDescription(
+      /EU Regulation 561\/2006/,
+    );
+
+    await user.click(complianceSwitch);
+    await user.clear(continuous);
+    await user.type(continuous, "240");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      ...SETTINGS,
+      complianceEnabled: false,
+      maxContinuousDrivingMinutes: 240,
+    });
+  });
+
+  it("checks the continuous/daily driving cross-field rule on the client", async () => {
+    const { user } = renderWithProviders(<SettingsPage />);
+    const continuous = await screen.findByRole("textbox", {
+      name: /Max continuous driving/,
+    });
+
+    await user.clear(continuous);
+    await user.type(continuous, "600");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(continuous).toHaveAccessibleDescription(
+      /Max continuous driving must be less than or equal to max daily driving/,
+    );
+    expect(updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("keeps the consolidation threshold disabled until the planner uses it", async () => {
+    renderWithProviders(<SettingsPage />);
+
     expect(
-      screen.getByRole("textbox", { name: /Fill threshold/ }),
+      await screen.findByRole("textbox", { name: /Fill threshold/ }),
     ).toBeDisabled();
-    expect(screen.getAllByText(/Not used yet/)).toHaveLength(2);
-    // Everything else stays editable.
-    expect(
-      screen.getByRole("textbox", { name: /Diesel price/ }),
-    ).not.toBeDisabled();
+    expect(screen.getAllByText(/Not used yet/)).toHaveLength(1);
   });
 
   it("shows a load error and retries", async () => {
