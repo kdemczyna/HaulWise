@@ -111,7 +111,7 @@
   - AC: the optimal and priority plans are shown side by side; a plain-language sentence states the delta in km, PLN and time; if priority costs nothing, the UI says "no extra cost"; delta values are computed by code and covered by tests.
 - **US-8 See the route.** As a dispatcher I see trucks and stops on a map and on a timeline.
   - AC: each truck has a colour; markers numbered by stop order; per-truck timeline with arrival times; utilisation bar (pallets and kg); warnings visible.
-US-9 and US-10 (T-22, T-23) were cut in lean mode, then revived post-MVP on 2026-11-14 (see T-22/T-23 below). US-11 to US-13 (T-24..T-28) remain cut to protect the must-haves.
+US-9 (T-22) was cut in lean mode, then revived post-MVP on 2026-11-14. US-10 (T-23) was also attempted that day but re-cut: the consolidation rule as designed can never match a pair the first-fit-decreasing packer actually produces (see ARCHITECTURE.md decision log) — a flaw in the original pre-cut design, not something a reviewed implementation could satisfy without touching the packer itself, which is off-limits (it would risk the pinned demo numbers). US-11 to US-13 (T-24..T-28) remain cut to protect the must-haves.
 
 - **US-9 Compliance (Should).** AC: driving time per truck checked against configurable limits; a violation shows a warning with the segment and a suggested break; limits editable in settings.
 - **US-10 Consolidation (Should).** AC: when two trucks to the same region are both below a configured fill threshold and fit together, a suggestion shows the saving in PLN and km.
@@ -160,7 +160,7 @@ Each task is about 1-3 hours.
 - [x] **T-20** UX polish: responsive layout, empty states, a11y pass, consistent copy. (Must)
 - [x] **T-21** README: overview, screenshots, run steps, architecture, API table, algorithm, fuel/cost model, trade-offs (OR-Tools/Timefold alternative), AI disclosure, e-TOLL as future work, a "Demo data" section (seed contents, `HAULWISE_SEED_ENABLED`, approximate matrix, demo deadlines relative to the startup day, moving a warehouse back to its old coordinates keeps estimated legs until restart (D-06)). (Must)
 - [x] **T-22** EU driving-time compliance check: enforce the pre-existing design (4.5h continuous driving -> `BREAK_REQUIRED` warning, 9h daily max -> `DAILY_DRIVING_EXCEEDED` warning, service/stop time does not reset the continuous-driving counter, return leg counts); warning-only, never alters the schedule (D-09); runs only when `complianceEnabled` is on; re-enable the Settings fields. (Should) - **cut in lean mode 2026-11-14, revived post-MVP same day**
-- [ ] **T-23** Load consolidation suggestion: enforce the pre-existing design (pairs of routes both below `consolidationFillThresholdPct`, combined load fits one truck, "same region" = stop-set centroids within 150 km, saving computed by actually re-sequencing the merged route, priority variant only); re-enable the Settings field. (Should) - **cut in lean mode 2026-11-14; attempted post-MVP same day, blocked: the rule as specified can never match a pair the first-fit-decreasing packer actually produces (see ARCHITECTURE.md), awaiting a decision on how to proceed**
+- [ ] **T-23** Load consolidation suggestion. (Should) - **cut in lean mode 2026-11-14; attempted post-MVP same day, re-cut: the rule as designed (combined load fits the larger-capacity truck of an underfilled pair) can never match a pair the first-fit-decreasing packer actually produces — proven, not just observed rare (see ARCHITECTURE.md decision log); fixing it would mean redesigning the packer, which risks the pinned demo numbers and is off-limits. The Settings fill-threshold field stays honestly disabled.**
 - [ ] **T-24** Feature flag endpoint + AI order parsing (Claude API, key from env). Key set but model empty = AI disabled (or default the model). (Should) - **cut** (lean mode)
 - [ ] **T-25** AI plan summary (prompt receives computed numbers only). (Should) - **cut** (lean mode)
 - [ ] **T-26** Optional OSRM table refresh with cache. (Should, only if time) - **cut** (lean mode)
@@ -201,7 +201,7 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | 14 | `feature/fleet-ops` | T-32, T-33 (post-MVP, after T-30/T-31; home depot and dispatch share the same "available truck pool per depot" concept) |
 | 15 | `feature/plan-history` | T-34 (post-MVP, after T-32/T-33) |
 | 16 | `feature/plan-shipment-refs` | T-35 (post-MVP, after T-34) |
-| 17 | `feature/compliance-consolidation-revived` | T-22, T-23 (post-MVP, after T-35; same tasks as row 9, cut then revived) |
+| 17 | `feature/compliance-consolidation-revived` | T-22 (post-MVP, after T-35; same task as row 9, cut then revived). T-23 was attempted on this branch too but re-cut (see US-10/T-23 above) — nothing to merge for it. |
 
 ### CUT LINE
 
