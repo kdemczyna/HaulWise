@@ -122,6 +122,7 @@ US-9 to US-13 were not built: their tasks (T-22..T-28) were cut in lean mode to 
 - **US-15 Editable settings (Extra, added post-MVP 2026-11-13).** AC: diesel price, average speed, road factor, priority weights and the EU driving-time limits are editable from the Settings page (not only via the API), with the same validation ranges as the backend and a success notification on save.
 - **US-16 Truck home depot (Extra, added post-MVP 2026-11-14).** AC: every truck has a home warehouse; a plan can only use trucks based at the chosen depot, enforced by the API (not just hidden in the UI); the Trucks page shows and can set a truck's home depot; adding trucks at other depots doesn't slow down planning or recommending trucks at depots with a small fleet.
 - **US-17 Dispatch a plan / "Send trucks" (Extra, added post-MVP 2026-11-14).** AC: from a plan result, "Send trucks" marks every truck actually used in the shown variant as on-route (unavailable for new plans) and removes every shipment that was routed in it (shipments left unassigned by the plan are untouched); nothing in-app represents messaging drivers — this only records the dispatch; a truck can be marked available again by hand on the Trucks page; sending the same plan twice is refused with a clear message, not a crash or a double delete.
+- **US-18 Recent plans (Extra, added post-MVP 2026-11-14).** AC: a "Recent plans" page lists every plan the in-memory store currently holds, newest-created first, showing its depot, when it was created, and whether and when it was sent; each row opens the existing plan result page; the list is honestly scoped as "recent" (capped, in-memory, lost on restart, like everything else), not sold as a permanent audit trail.
 
 ## 6. Task breakdown and milestones
 
@@ -171,6 +172,7 @@ Each task is about 1-3 hours.
 - [x] **T-31** Editable Settings page: a form for GET/PUT `/api/settings` with the same validation ranges as the backend. (Extra, US-15)
 - [x] **T-32** Truck home depot: `homeWarehouseId` on Truck; keep the existing 5 WAW Central trucks unchanged (preserves the demo numbers byte-for-byte), add new trucks at POZ West (and optionally elsewhere) sized for its own shipments; `POST /api/plans` and `/api/trucks/recommend` only consider trucks homed at the chosen depot (400/no-candidate, never a cross-depot result); Trucks CRUD shows/sets the home depot; Plan form's truck checklist filters by the selected depot. A test must prove a bigger fleet at one depot doesn't slow down planning at another. (Extra, US-16)
 - [x] **T-33** Dispatch a plan ("Send trucks"): `available` flag on Truck (toggle by hand on the Trucks page, reusing truck CRUD); `POST /api/plans/{id}/dispatch` (chosen variant) marks its routed trucks unavailable and deletes its routed shipments, idempotent (a second dispatch of the same plan is refused with a clear message, not a crash); plans and recommendations also exclude unavailable trucks (depends on T-32). (Extra, US-17)
+- [ ] **T-34** Recent plans: `GET /api/plans` lists everything `PlanStore` currently holds as lightweight summaries (id, depot, createdAt, dispatchedAt, shipment/truck counts), sorted by `createdAt` descending — not the store's internal LRU access order, which is oldest-accessed-first and would reorder on every `GET /api/plans/{id}`. A "Recent plans" page (reusing `ListView`/`TableBox`) lists them with a Draft/Sent status and a link into the existing result page; an empty state links to "Plan a run". (Extra, US-18)
 
 **Day 3 milestone:** polished plan UI, tests green, README complete, clean-clone run works.
 
@@ -195,6 +197,7 @@ One branch per batch of related tasks, cut from the latest `main`. One commit pe
 | 12 | `docs/readme-final-qa` | T-21, T-29 (always last, so the README describes what was built) |
 | 13 | `feature/extras` | T-30, T-31 (post-MVP, after T-29; README not re-run at that point) |
 | 14 | `feature/fleet-ops` | T-32, T-33 (post-MVP, after T-30/T-31; home depot and dispatch share the same "available truck pool per depot" concept) |
+| 15 | `feature/plan-history` | T-34 (post-MVP, after T-32/T-33) |
 
 ### CUT LINE
 
