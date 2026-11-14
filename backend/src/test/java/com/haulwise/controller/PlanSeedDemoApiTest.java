@@ -123,7 +123,16 @@ class PlanSeedDemoApiTest {
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].shipmentIds").value(contains((int) po1042)))
                 .andExpect(jsonPath("$.optimal.routes[0].warnings[0].message").value("WX 1001A arrives in Gdansk "
                         + "at 13 Nov, 23:18, after the deadline of PO-1042 (13 Nov, 12:00)."))
-                .andExpect(jsonPath("$.priority.routes[0].warnings", hasSize(0)))
+                // T-22: WX 1001A drives 21 h 54 min in PRIORITY - no deadline is missed, but the EU driving-time
+                // check (on by default) asks for four breaks and flags the 9 h day
+                .andExpect(jsonPath("$.priority.routes[0].warnings[*].code").value(contains("BREAK_REQUIRED",
+                        "BREAK_REQUIRED", "BREAK_REQUIRED", "BREAK_REQUIRED", "DAILY_DRIVING_EXCEEDED")))
+                .andExpect(jsonPath("$.priority.routes[0].warnings[0].message").value("WX 1001A reaches 4 h 30 min "
+                        + "of continuous driving on WAW Central -> GDN Port. Take a 45 min break before ~13 Nov, 10:30."))
+                .andExpect(jsonPath("$.priority.routes[0].warnings[3].message").value("WX 1001A reaches 4 h 30 min "
+                        + "of continuous driving on KTW Silesia -> WAW Central. Take a 45 min break before ~14 Nov, 02:00."))
+                .andExpect(jsonPath("$.priority.routes[0].warnings[4].message").value("WX 1001A drives 21 h 54 min "
+                        + "in total, more than the 9 h daily driving limit. Plan a second driver or split the route."))
                 .andExpect(jsonPath("$.unassigned", hasSize(1)))
                 .andExpect(jsonPath("$.unassigned[0].shipmentId").value(po1099))
                 .andExpect(jsonPath("$.unassigned[0].reference").value("PO-1099"))

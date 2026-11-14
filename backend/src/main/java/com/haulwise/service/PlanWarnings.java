@@ -2,6 +2,7 @@ package com.haulwise.service;
 
 import com.haulwise.dto.plan.PlanWarningCode;
 import com.haulwise.dto.plan.WarningResponse;
+import com.haulwise.solver.DeltaCalculator;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -45,6 +46,30 @@ final class PlanWarnings {
                 + (late.size() == 1 ? "" : "s") + " of " + joinWithAnd(deadlines) + ".";
         return WarningResponse.of(PlanWarningCode.DEADLINE_MISSED, message, truckId,
                 late.stream().map(LateShipment::shipmentId).toList());
+    }
+
+    /**
+     * "WX 1001A reaches 4 h 30 min of continuous driving on WAW Central -> GDN Port. Take a 45 min break before
+     * ~13 Nov, 10:30."
+     */
+    static WarningResponse breakRequired(long truckId, String plate, String legName, int continuousLimitMinutes,
+                                         int breakMinutes, LocalDateTime latestBreak) {
+        String message = plate + " reaches " + DeltaCalculator.duration(continuousLimitMinutes)
+                + " of continuous driving on " + legName + ". Take a " + DeltaCalculator.duration(breakMinutes)
+                + " break before ~" + TIME.format(latestBreak) + ".";
+        return WarningResponse.of(PlanWarningCode.BREAK_REQUIRED, message, truckId, List.of());
+    }
+
+    /**
+     * "WX 1001A drives 20 h 41 min in total, more than the 9 h daily driving limit. Plan a second driver or split
+     * the route."
+     */
+    static WarningResponse dailyDrivingExceeded(long truckId, String plate, long drivingMinutes,
+                                                int dailyLimitMinutes) {
+        String message = plate + " drives " + DeltaCalculator.duration(Math.toIntExact(drivingMinutes))
+                + " in total, more than the " + DeltaCalculator.duration(dailyLimitMinutes)
+                + " daily driving limit. Plan a second driver or split the route.";
+        return WarningResponse.of(PlanWarningCode.DAILY_DRIVING_EXCEEDED, message, truckId, List.of());
     }
 
     /**

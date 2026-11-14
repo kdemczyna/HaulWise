@@ -3,13 +3,17 @@ package com.haulwise.dto.plan;
 /**
  * Plan warning codes (ARCHITECTURE section 5), each with its severity. PIN_CONFLICT comes from the solver;
  * DEADLINE_MISSED and ESTIMATED_DISTANCE are derived by the plan service (the solver works with minute offsets,
- * not clock times). BREAK_REQUIRED and DAILY_DRIVING_EXCEEDED are added by T-22.
+ * not clock times). BREAK_REQUIRED and DAILY_DRIVING_EXCEEDED come from the solver's compliance check (T-22).
  */
 public enum PlanWarningCode {
     /** More than one stop on a truck was pinned first; only one pin was kept. */
     PIN_CONFLICT(WarningSeverity.WARNING),
     /** A stop is reached after the deadline of one of its shipments. */
     DEADLINE_MISSED(WarningSeverity.WARNING),
+    /** Continuous driving reaches the EU limit on a leg; a break is due (T-22). */
+    BREAK_REQUIRED(WarningSeverity.WARNING),
+    /** A route's total driving exceeds the EU daily limit (T-22). */
+    DAILY_DRIVING_EXCEEDED(WarningSeverity.WARNING),
     /** A driven leg uses a straight-line estimate instead of a stored road distance. */
     ESTIMATED_DISTANCE(WarningSeverity.INFO);
 

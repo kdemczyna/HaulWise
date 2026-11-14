@@ -37,6 +37,30 @@ class PlanWarningsTest {
     }
 
     @Test
+    void breakRequiredNamesTheLegTheBreakAndTheLatestStart() {
+        WarningResponse warning = PlanWarnings.breakRequired(1, "WX 1001A", "WAW Central -> GDN Port", 270, 45,
+                LocalDateTime.of(2026, 11, 13, 10, 30));
+
+        assertThat(warning.code()).isEqualTo(PlanWarningCode.BREAK_REQUIRED);
+        assertThat(warning.severity()).isEqualTo(WarningSeverity.WARNING);
+        assertThat(warning.truckId()).isEqualTo(1L);
+        assertThat(warning.shipmentIds()).isEmpty();
+        assertThat(warning.message()).isEqualTo("WX 1001A reaches 4 h 30 min of continuous driving on "
+                + "WAW Central -> GDN Port. Take a 45 min break before ~13 Nov, 10:30.");
+    }
+
+    @Test
+    void dailyDrivingExceededStatesTotalAndLimit() {
+        WarningResponse warning = PlanWarnings.dailyDrivingExceeded(2, "WX 2002B", 1239, 540);
+
+        assertThat(warning.code()).isEqualTo(PlanWarningCode.DAILY_DRIVING_EXCEEDED);
+        assertThat(warning.severity()).isEqualTo(WarningSeverity.WARNING);
+        assertThat(warning.truckId()).isEqualTo(2L);
+        assertThat(warning.message()).isEqualTo("WX 2002B drives 20 h 39 min in total, more than the 9 h daily "
+                + "driving limit. Plan a second driver or split the route.");
+    }
+
+    @Test
     void deadlineMissedListsEachLateShipmentWithItsDeadline() {
         WarningResponse warning = PlanWarnings.deadlineMissed(2, "WX 2002B", "Lublin", NOON.plusHours(3),
                 List.of(new LateShipment(5, "PO-5", NOON), new LateShipment(6, "PO-6", NOON.plusHours(1))));

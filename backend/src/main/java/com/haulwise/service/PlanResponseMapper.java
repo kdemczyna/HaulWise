@@ -15,6 +15,9 @@ import com.haulwise.dto.plan.UnassignedResponse;
 import com.haulwise.dto.plan.UtilisationResponse;
 import com.haulwise.dto.plan.WarningResponse;
 import com.haulwise.service.PlanWarnings.LateShipment;
+import com.haulwise.solver.model.ComplianceWarning;
+import com.haulwise.solver.model.ComplianceWarning.BreakRequired;
+import com.haulwise.solver.model.ComplianceWarning.DailyDrivingExceeded;
 import com.haulwise.solver.model.DirectedPair;
 import com.haulwise.solver.model.Leg;
 import com.haulwise.solver.model.PlanVariant;
@@ -36,7 +39,8 @@ import java.util.stream.Stream;
 /**
  * Maps a {@link SolverResult} to the plan response (ARCHITECTURE section 5): clock times from the departure time
  * plus the solver's minute offsets (rounded to whole minutes), {@code deadlineMissed} per stop with a
- * DEADLINE_MISSED route warning, user-facing warning texts, and all numbers rounded by {@link PlanNumbers}.
+ * DEADLINE_MISSED route warning, the solver's driving-time warnings (after the deadline ones) as route warnings,
+ * user-facing warning texts, and all numbers rounded by {@link PlanNumbers}.
  * Works on snapshots taken from the entities, so it needs no persistence session.
  */
 final class PlanResponseMapper {
@@ -99,6 +103,7 @@ final class PlanResponseMapper {
                         lateShipments(stops.get(i), stop.arrivalTime())));
             }
         }
+        plan.complianceWarnings().forEach(warning -> warnings.add(compliance(warning)));
         Leg returnLeg = plan.route().evaluation().returnLeg().orElse(null);
         return new RouteResponse(truckId, plate(truckId), colorIndex, UtilisationResponse.from(plan.load()),
                 departure, returnLeg == null ? null : at(returnLeg.arrivalMinutes()), stopResponses,
@@ -143,6 +148,19 @@ final class PlanResponseMapper {
                 warning.shipmentIds());
     }
 
+    /** The user-facing BREAK_REQUIRED / DAILY_DRIVING_EXCEEDED: plate, leg names and the break's clock time. */
+    private WarningResponse compliance(ComplianceWarning warning) {
+        long truckId = warning.truckId();
+        if (warning instanceof BreakRequired breakRequired) {
+            return PlanWarnings.breakRequired(truckId, plate(truckId), legName(breakRequired.leg()),
+                    breakRequired.continuousLimitMinutes(), breakRequired.breakMinutes(),
+                    at(breakRequired.atMinutes()));
+        }
+        DailyDrivingExceeded daily = (DailyDrivingExceeded) warning;
+        return PlanWarnings.dailyDrivingExceeded(truckId, plate(truckId), PlanNumbers.minutes(daily.drivingMinutes()),
+                daily.dailyLimitMinutes());
+    }
+
     private List<String> references(List<Long> shipmentIds) {
         return shipmentIds.stream().map(id -> shipment(id).reference()).toList();
     }
@@ -155,9 +173,12 @@ final class PlanResponseMapper {
                 .flatMap(route -> route.route().evaluation().allLegs().stream())
                 .filter(leg -> leg.distance().isEstimated())
                 .forEach(leg -> estimated.add(new DirectedPair(leg.fromId(), leg.toId())));
-        return estimated.stream()
-                .map(pair -> warehouse(pair.fromId()).name() + " -> " + warehouse(pair.toId()).name())
-                .toList();
+        return estimated.stream().map(this::legName).toList();
+    }
+
+    /** "WAW Central -> GDN Port". */
+    private String legName(DirectedPair leg) {
+        return warehouse(leg.fromId()).name() + " -> " + warehouse(leg.toId()).name();
     }
 
     private UnassignedResponse unassigned(Unassigned unassigned) {

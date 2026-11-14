@@ -66,6 +66,18 @@ export function allWarnings(plan) {
   return [...planLevel, ...routeLevel];
 }
 
+const DRIVING_TIME_CODES = new Set([
+  "BREAK_REQUIRED",
+  "DAILY_DRIVING_EXCEEDED",
+]);
+
+/** A route's EU driving-time warnings (T-22), in the order the backend lists them. */
+export function drivingTimeWarnings(route) {
+  return route.warnings.filter((warning) =>
+    DRIVING_TIME_CODES.has(warning.code),
+  );
+}
+
 /** Trucks and shipment count that sending `variant` ("optimal" | "priority") affects. */
 export function dispatchScope(plan, variant) {
   const routes = plan[variant].routes;

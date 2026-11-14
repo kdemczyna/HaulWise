@@ -6,10 +6,12 @@ import com.haulwise.dto.SettingsResponse;
 import com.haulwise.exception.FieldViolation;
 import com.haulwise.exception.RequestValidationException;
 import com.haulwise.repository.SettingsRepository;
+import com.haulwise.solver.model.ComplianceRules;
 import com.haulwise.solver.model.CostParameters;
 import com.haulwise.solver.model.PriorityWeights;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +49,19 @@ public class SettingsService {
     public PriorityWeights priorityWeights() {
         Settings settings = loadOrCreate();
         return new PriorityWeights(settings.getUrgentWeightPlnPerHour(), settings.getHighWeightPlnPerHour());
+    }
+
+    /**
+     * EU driving-time limits for the compliance check (ARCHITECTURE 6.4, T-22), or empty when compliance checking
+     * is disabled; not for the API.
+     */
+    public Optional<ComplianceRules> complianceRules() {
+        Settings settings = loadOrCreate();
+        if (!settings.isComplianceEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(new ComplianceRules(settings.getMaxContinuousDrivingMinutes(), settings.getBreakMinutes(),
+                settings.getMaxDailyDrivingMinutes()));
     }
 
     public SettingsResponse update(SettingsRequest request) {

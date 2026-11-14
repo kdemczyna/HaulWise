@@ -1,5 +1,6 @@
 package com.haulwise.solver;
 
+import com.haulwise.solver.model.ComplianceWarning;
 import com.haulwise.solver.model.Mode;
 import com.haulwise.solver.model.PackingResult;
 import com.haulwise.solver.model.PinResolution;
@@ -13,6 +14,7 @@ import com.haulwise.solver.model.Warning;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Runs the solver pipeline for one plan and produces both variants (ARCHITECTURE 6.1):
@@ -22,6 +24,8 @@ import java.util.Objects;
  *       reports PIN_CONFLICT; the same stops feed both variants;</li>
  *   <li>per truck, {@link StopSequencer} with {@link RouteObjective#COST} (OPTIMAL) and
  *       {@link PriorityObjective} (PRIORITY);</li>
+ *   <li>when the input has compliance rules, {@link ComplianceChecker} annotates each variant's route with
+ *       EU driving-time warnings (T-22) - warnings only, the order and cost are unchanged;</li>
  *   <li>optimal-dominance guard (D-14): if the PRIORITY order is strictly cheaper than the OPTIMAL one by
  *       unrounded {@code evaluation().totals().costPln()} (never the objective value), OPTIMAL uses it too,
  *       so the cost of priority is never negative;</li>
@@ -63,6 +67,8 @@ public final class Planner {
         StopSequencer sequencer = new StopSequencer(input.distances(), input.costParameters(), maxBruteForceStops);
         PriorityObjective priorityObjective = new PriorityObjective(input.priorityWeights());
 
+        Optional<ComplianceChecker> compliance = input.compliance().map(ComplianceChecker::new);
+
         List<RoutePlan> optimalRoutes = new ArrayList<>();
         List<RoutePlan> priorityRoutes = new ArrayList<>();
         List<Warning> warnings = new ArrayList<>();
@@ -73,14 +79,25 @@ public final class Planner {
                     input.returnToDepot(), RouteObjective.COST);
             SequencedRoute byPriority = sequencer.sequence(input.depotId(), resolution.stops(), load.truck(),
                     input.returnToDepot(), priorityObjective);
-            optimalRoutes.add(new RoutePlan(load, cheaper(byCost, byPriority)));
-            priorityRoutes.add(new RoutePlan(load, byPriority));
+            optimalRoutes.add(annotated(load, cheaper(byCost, byPriority), compliance));
+            priorityRoutes.add(annotated(load, byPriority, compliance));
         }
 
         PlanVariant optimal = new PlanVariant(Mode.OPTIMAL, optimalRoutes);
         PlanVariant priority = new PlanVariant(Mode.PRIORITY, priorityRoutes);
         return new SolverResult(optimal, priority, deltaCalculator.calculate(optimal, priority, input.cityNames()),
                 packing.unassigned(), warnings);
+    }
+
+    /**
+     * The route with its driving-time warnings (step 5). Checking the order chosen by the guard is the same as
+     * checking both orders before it: the warnings belong to an order and travel with it.
+     */
+    private static RoutePlan annotated(TruckLoad load, SequencedRoute route, Optional<ComplianceChecker> compliance) {
+        List<ComplianceWarning> complianceWarnings = compliance
+                .map(checker -> checker.check(load.truck().id(), route.evaluation()))
+                .orElse(List.of());
+        return new RoutePlan(load, route, complianceWarnings);
     }
 
     /**

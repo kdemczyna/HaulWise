@@ -164,15 +164,13 @@ export function SettingsForm({ settings, onSave }) {
             Compliance
           </Title>
           <Text id="compliance-note" size="sm" c="dimmed">
-            Not used yet: these values are saved, but the planner doesn&rsquo;t
-            check driving time against them or warn about a violation (that
-            feature was planned, then cut to protect the deadline). Fields are
-            disabled so changing them doesn&rsquo;t look like it changes
-            planning.
+            Each route is checked against these limits (EU Regulation 561/2006)
+            and gets a warning when a break is due or the day&rsquo;s driving is
+            too long. Warnings only: planned arrival times don&rsquo;t include
+            breaks.
           </Text>
           <Switch
             label="Enforce EU driving-time limits"
-            disabled
             aria-describedby="compliance-note"
             {...form.getInputProps("complianceEnabled", { type: "checkbox" })}
           />
@@ -182,8 +180,6 @@ export function SettingsForm({ settings, onSave }) {
               description="30 to 900, must be <= max daily driving"
               withAsterisk
               allowDecimal={false}
-              disabled
-              aria-describedby="compliance-note"
               {...form.getInputProps("maxContinuousDrivingMinutes")}
             />
             <NumberInput
@@ -191,8 +187,6 @@ export function SettingsForm({ settings, onSave }) {
               description="15 to 180"
               withAsterisk
               allowDecimal={false}
-              disabled
-              aria-describedby="compliance-note"
               {...form.getInputProps("breakMinutes")}
             />
             <NumberInput
@@ -200,8 +194,6 @@ export function SettingsForm({ settings, onSave }) {
               description="60 to 900"
               withAsterisk
               allowDecimal={false}
-              disabled
-              aria-describedby="compliance-note"
               {...form.getInputProps("maxDailyDrivingMinutes")}
             />
           </SimpleGrid>

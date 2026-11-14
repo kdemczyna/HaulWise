@@ -249,7 +249,8 @@ public class PlanService {
                 distanceService.buildMatrix(stops.keySet()),
                 settingsService.costParameters(),
                 settingsService.priorityWeights(),
-                cityNames);
+                cityNames,
+                settingsService.complianceRules());
     }
 
     private static PlanResponseMapper mapper(Selection selection, LocalDateTime departure) {

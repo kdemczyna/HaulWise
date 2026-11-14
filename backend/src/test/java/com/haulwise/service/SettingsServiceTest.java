@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.haulwise.HaulWiseApiTest;
 import com.haulwise.domain.Settings;
 import com.haulwise.repository.SettingsRepository;
+import com.haulwise.solver.model.ComplianceRules;
 import com.haulwise.solver.model.CostParameters;
 import com.haulwise.solver.model.PriorityWeights;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,5 +70,19 @@ class SettingsServiceTest {
         settingsRepository.save(settings);
 
         assertThat(settingsService.priorityWeights()).isEqualTo(new PriorityWeights(220.5, 0));
+    }
+
+    @Test
+    void complianceRulesDefaultToSection64Values() {
+        assertThat(settingsService.complianceRules()).contains(new ComplianceRules(270, 45, 540));
+    }
+
+    @Test
+    void complianceRulesAreEmptyWhenComplianceIsDisabled() {
+        Settings settings = Settings.withDefaults();
+        settings.setComplianceEnabled(false);
+        settingsRepository.save(settings);
+
+        assertThat(settingsService.complianceRules()).isEmpty();
     }
 }

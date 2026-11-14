@@ -9,6 +9,7 @@ import {
   Title,
 } from "@mantine/core";
 import { routeColor } from "../../utils/colors.js";
+import { drivingTimeWarnings } from "../../utils/plan.js";
 import {
   formatDateTime,
   formatDuration,
@@ -19,6 +20,27 @@ import {
 } from "../../utils/format.js";
 import { StopTimeline } from "./StopTimeline.jsx";
 import { UtilisationBar } from "./UtilisationBar.jsx";
+
+/** The route's EU driving-time warnings (breaks due, daily limit), if any. */
+function DrivingTimeWarnings({ warnings }) {
+  if (warnings.length === 0) {
+    return null;
+  }
+  return (
+    <Stack gap={4}>
+      <Text size="sm" fw={600}>
+        Driving time
+      </Text>
+      <Stack component="ul" gap={4} className="hw-plain-list">
+        {warnings.map((warning) => (
+          <Text component="li" size="sm" key={warning.message}>
+            {warning.message}
+          </Text>
+        ))}
+      </Stack>
+    </Stack>
+  );
+}
 
 /**
  * One truck's route in the selected variant. When the route is the same in both plans
@@ -86,6 +108,7 @@ export function RouteCard({ route, variant, sameInBoth }) {
             ? `, back at the depot ${formatDateTime(route.returnTime)}`
             : ", does not return to the depot"}
         </Text>
+        <DrivingTimeWarnings warnings={drivingTimeWarnings(route)} />
       </Stack>
     </Paper>
   );
