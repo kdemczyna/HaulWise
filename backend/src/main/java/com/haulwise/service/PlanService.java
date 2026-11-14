@@ -7,6 +7,7 @@ import com.haulwise.domain.Warehouse;
 import com.haulwise.dto.WarehouseResponse;
 import com.haulwise.dto.plan.PlanRequest;
 import com.haulwise.dto.plan.PlanResponse;
+import com.haulwise.dto.plan.PlanSummaryResponse;
 import com.haulwise.exception.FieldViolation;
 import com.haulwise.exception.NotFoundException;
 import com.haulwise.exception.RequestValidationException;
@@ -123,6 +124,11 @@ public class PlanService {
      */
     public PlanResponse get(String id) {
         return planStore.find(id).orElseThrow(() -> new NotFoundException("Plan", id));
+    }
+
+    /** Summaries of every stored plan, newest created first (T-34); empty after a restart. */
+    public List<PlanSummaryResponse> list() {
+        return planStore.listNewestFirst().stream().map(PlanSummaryResponse::from).toList();
     }
 
     // --- validation -------------------------------------------------------------------------------------------

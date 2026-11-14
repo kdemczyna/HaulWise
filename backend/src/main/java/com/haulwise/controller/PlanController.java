@@ -4,11 +4,13 @@ import com.haulwise.dto.plan.DispatchRequest;
 import com.haulwise.dto.plan.DispatchResponse;
 import com.haulwise.dto.plan.PlanRequest;
 import com.haulwise.dto.plan.PlanResponse;
+import com.haulwise.dto.plan.PlanSummaryResponse;
 import com.haulwise.service.PlanDispatchService;
 import com.haulwise.service.PlanService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +36,15 @@ public class PlanController {
     public PlanController(PlanService planService, PlanDispatchService dispatchService) {
         this.planService = planService;
         this.dispatchService = dispatchService;
+    }
+
+    @Operation(summary = "List recent plans",
+            description = "Summaries of every plan the in-memory store currently holds (at most 50, lost on "
+                    + "restart), newest created first. dispatchedAt is null until the plan was sent. Open one "
+                    + "with GET /api/plans/{id}.")
+    @GetMapping
+    public List<PlanSummaryResponse> list() {
+        return planService.list();
     }
 
     @Operation(summary = "Plan a run from one depot",
