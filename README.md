@@ -12,6 +12,8 @@ This is a recruitment-task project: a small, readable, deterministic solver (bin
 
 ## Screenshots
 
+📹 [Watch a short demo](<Warehouses - HaulWise – Demo.mp4>) — a walkthrough of planning a run, the cost-of-priority result, dispatching trucks and the rest of the app.
+
 ![Plan result: cost-of-priority banner and optimal vs priority comparison](docs/screenshots/plan-result-cost-of-priority.jpg)
 
 *Plan result — the cost-of-priority banner and the optimal-vs-priority comparison table.*
